@@ -63,6 +63,8 @@ Other useful scripts:
 
 - `npm run lint`
 - `npm run build`
+- `npm run vercel-build`
+- `npm run db:migrate:deploy`
 - `npx tsc --noEmit`
 
 ## Folder Structure
@@ -138,6 +140,50 @@ Run it with:
 ```bash
 npm run db:seed
 ```
+
+## Vercel Deployment
+
+This repo is configured for Vercel with a checked-in [vercel.json](/Users/jakealessi/Documents/FamilyTree/vercel.json) and a dedicated production build command:
+
+```bash
+npm run vercel-build
+```
+
+That command runs:
+
+1. `prisma migrate deploy`
+2. `prisma generate`
+3. `next build --webpack`
+
+### Recommended database setup
+
+Supabase Postgres is the easiest path.
+
+- `DATABASE_URL`: use your runtime/serverless connection string
+- `DIRECT_URL`: use your direct Postgres connection string for Prisma admin tasks
+
+If you are using Supabase, their current guidance is:
+
+- transaction mode pooler for serverless runtime traffic
+- direct connection for admin and migration tasks
+
+### Vercel project settings
+
+- Framework preset: `Next.js`
+- Build command: `npm run vercel-build`
+- Install command: `npm install`
+
+### Required environment variables in Vercel
+
+- `DATABASE_URL`
+- `DIRECT_URL`
+- `NEXT_PUBLIC_APP_URL`
+- `ADMIN_RECOVERY_TOKEN`
+- `MAX_UPLOAD_SIZE_BYTES`
+
+### Important production note
+
+Do not run `npm run db:seed` against production. The demo seed clears seeded records before inserting sample family data.
 
 ## Deployment Notes
 

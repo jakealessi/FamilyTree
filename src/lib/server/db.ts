@@ -6,8 +6,17 @@ declare global {
   var prisma: PrismaClient | undefined;
 }
 
-const connectionString =
-  process.env.DATABASE_URL ?? "postgresql://postgres:postgres@127.0.0.1:5432/familytree";
+const localFallbackUrl = "postgresql://postgres:postgres@127.0.0.1:5432/familytree";
+const configuredConnectionString =
+  process.env.DATABASE_URL ?? (process.env.VERCEL ? null : localFallbackUrl);
+
+if (!configuredConnectionString) {
+  throw new Error(
+    "DATABASE_URL is required to start the server on Vercel.",
+  );
+}
+
+const connectionString = configuredConnectionString;
 
 function createClient() {
   const pool = new Pool({
