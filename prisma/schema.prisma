@@ -1,0 +1,245 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum TreeStatus {
+  ACTIVE
+  ARCHIVED
+}
+
+enum AccessRole {
+  OWNER
+  CONTRIBUTOR
+  VIEWER
+  PERSONAL
+}
+
+enum Gender {
+  UNSPECIFIED
+  FEMALE
+  MALE
+  NON_BINARY
+  OTHER
+}
+
+enum LifeStatus {
+  UNKNOWN
+  LIVING
+  DECEASED
+}
+
+enum RelationshipType {
+  PARENT
+  CHILD
+  SPOUSE
+  SIBLING
+  ADOPTED
+  STEP
+  FOSTER
+}
+
+enum RelationshipStatus {
+  ACTIVE
+  PENDING
+  REJECTED
+  REMOVED
+}
+
+enum MediaType {
+  PROFILE
+  GALLERY
+  DOCUMENT
+}
+
+enum EditEntityType {
+  FAMILY_TREE
+  PERSON
+  RELATIONSHIP
+  MEDIA
+  CLAIM
+}
+
+enum EditAction {
+  CREATE
+  UPDATE
+  SOFT_DELETE
+  RESTORE
+  APPROVE
+  REJECT
+  ROLLBACK
+  CLAIM
+  REACTIVATE
+}
+
+enum ModerationMode {
+  OPEN
+  REVIEW_STRUCTURE
+}
+
+model FamilyTree {
+  id             String           @id @default(cuid())
+  slug           String           @unique
+  title          String
+  subtitle       String?
+  description    String?          @db.Text
+  ownerToken     String           @unique @db.Text
+  contributorToken String         @unique @db.Text
+  viewerToken    String?          @unique @db.Text
+  moderationMode ModerationMode   @default(REVIEW_STRUCTURE)
+  status         TreeStatus       @default(ACTIVE)
+  archivedAt     DateTime?
+  lastActivityAt DateTime         @default(now())
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  people         Person[]
+  relationships  Relationship[]
+  editorIdentities EditorIdentity[]
+  media          Media[]
+  editHistory    EditHistory[]
+  claimRecoveries ClaimRecovery[]
+
+  @@index([lastActivityAt])
+}
+
+model EditorIdentity {
+  id              String          @id @default(cuid())
+  treeId          String
+  browserTokenHash String
+  displayName     String?
+  accentColor     String?
+  claimedPersonId String?         @unique
+  lastSeenAt      DateTime        @default(now())
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  tree            FamilyTree      @relation(fields: [treeId], references: [id], onDelete: Cascade)
+  claimedPerson   Person?         @relation("IdentityClaim", fields: [claimedPersonId], references: [id], onDelete: SetNull)
+  edits           EditHistory[]
+  claimRecoveries ClaimRecovery[]
+
+  @@unique([treeId, browserTokenHash])
+  @@index([treeId])
+}
+
+model Person {
+  id                  String         @id @default(cuid())
+  treeId              String
+  firstName           String
+  middleName          String?
+  lastName            String?
+  maidenName          String?
+  displayName         String?
+  nickname            String?
+  gender              Gender         @default(UNSPECIFIED)
+  lifeStatus          LifeStatus     @default(UNKNOWN)
+  birthDate           DateTime?
+  deathDate           DateTime?
+  birthplace          String?
+  currentCity         String?
+  bio                 String?        @db.Text
+  occupation          String?
+  education           String?
+  hobbies             String?
+  favoriteQuote       String?        @db.Text
+  profilePhotoUrl     String?        @db.Text
+  galleryPhotos       Json?
+  lifeEvents          Json?
+  notes               Json?
+  generation          Int?
+  branchKey           String?
+  layoutX             Float?
+  layoutY             Float?
+  isPrivate           Boolean        @default(true)
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+  deletedAt           DateTime?
+  tree                FamilyTree     @relation(fields: [treeId], references: [id], onDelete: Cascade)
+  claimedBy           EditorIdentity? @relation("IdentityClaim")
+  outgoingRelationships Relationship[] @relation("FromPerson")
+  incomingRelationships Relationship[] @relation("ToPerson")
+  media               Media[]
+  claimRecoveries     ClaimRecovery[]
+
+  @@index([treeId, lastName, firstName])
+  @@index([treeId, deletedAt])
+}
+
+model Relationship {
+  id                String              @id @default(cuid())
+  treeId            String
+  fromPersonId      String
+  toPersonId        String
+  type              RelationshipType
+  status            RelationshipStatus  @default(ACTIVE)
+  note              String?             @db.Text
+  proposedByEditorId String?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  deletedAt         DateTime?
+  tree              FamilyTree          @relation(fields: [treeId], references: [id], onDelete: Cascade)
+  fromPerson        Person              @relation("FromPerson", fields: [fromPersonId], references: [id], onDelete: Cascade)
+  toPerson          Person              @relation("ToPerson", fields: [toPersonId], references: [id], onDelete: Cascade)
+
+  @@index([treeId, status])
+  @@index([fromPersonId])
+  @@index([toPersonId])
+}
+
+model Media {
+  id          String    @id @default(cuid())
+  treeId      String
+  personId    String
+  type        MediaType
+  url         String    @db.Text
+  fileName    String?
+  mimeType    String?
+  caption     String?   @db.Text
+  sizeBytes   Int?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+  tree        FamilyTree @relation(fields: [treeId], references: [id], onDelete: Cascade)
+  person      Person     @relation(fields: [personId], references: [id], onDelete: Cascade)
+
+  @@index([treeId, personId])
+}
+
+model EditHistory {
+  id              String        @id @default(cuid())
+  treeId          String
+  editorIdentityId String?
+  entityType      EditEntityType
+  entityId        String
+  action          EditAction
+  accessRole      AccessRole
+  summary         String        @db.Text
+  before          Json?
+  after           Json?
+  createdAt       DateTime      @default(now())
+  rolledBackAt    DateTime?
+  tree            FamilyTree    @relation(fields: [treeId], references: [id], onDelete: Cascade)
+  editorIdentity  EditorIdentity? @relation(fields: [editorIdentityId], references: [id], onDelete: SetNull)
+
+  @@index([treeId, createdAt])
+  @@index([treeId, entityType, entityId])
+}
+
+model ClaimRecovery {
+  id                    String         @id @default(cuid())
+  treeId                String
+  personId              String
+  editorIdentityId      String?
+  recoveryCodeHash      String         @unique
+  personalLinkTokenHash String         @unique
+  lastUsedAt            DateTime?
+  createdAt             DateTime       @default(now())
+  updatedAt             DateTime       @updatedAt
+  tree                  FamilyTree     @relation(fields: [treeId], references: [id], onDelete: Cascade)
+  person                Person         @relation(fields: [personId], references: [id], onDelete: Cascade)
+  editorIdentity        EditorIdentity? @relation(fields: [editorIdentityId], references: [id], onDelete: SetNull)
+
+  @@index([treeId, personId])
+}
