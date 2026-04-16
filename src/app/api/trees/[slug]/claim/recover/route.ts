@@ -33,6 +33,13 @@ export async function POST(request: Request, context: RouteContext) {
     return jsonError("Tree not found.", 404);
   }
 
+  if (access.isArchived) {
+    return jsonError(
+      "Archived trees must be reactivated with the owner link before personal recovery can continue.",
+      409,
+    );
+  }
+
   const recovery = await prisma.claimRecovery.findFirst({
     where: {
       treeId: access.tree.id,

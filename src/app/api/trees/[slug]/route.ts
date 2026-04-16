@@ -96,6 +96,14 @@ export async function GET(request: Request, context: RouteContext) {
       visiblePersonIds.has(relationship.fromPersonId) &&
       visiblePersonIds.has(relationship.toPersonId),
   );
+  const activeRelationships = visibleRelationships.filter(
+    (relationship) => relationship.status === RelationshipStatus.ACTIVE,
+  );
+  const pendingRelationships = visibleRelationships.filter(
+    (relationship) => relationship.status === RelationshipStatus.PENDING,
+  );
+  const canSeeModerationQueue =
+    access.role === "OWNER" || access.role === "CONTRIBUTOR";
 
   const response: TreeBundle = {
     tree: {
@@ -170,7 +178,7 @@ export async function GET(request: Request, context: RouteContext) {
         sizeBytes: media.sizeBytes ?? null,
       })),
     })),
-    relationships: visibleRelationships.map((relationship) => ({
+    relationships: activeRelationships.map((relationship) => ({
       id: relationship.id,
       fromPersonId: relationship.fromPersonId,
       toPersonId: relationship.toPersonId,
@@ -190,16 +198,16 @@ export async function GET(request: Request, context: RouteContext) {
       rolledBackAt: entry.rolledBackAt?.toISOString() ?? null,
       editorIdentity: entry.editorIdentity,
     })),
-    moderationQueue: visibleRelationships
-      .filter((relationship) => relationship.status === RelationshipStatus.PENDING)
-      .map((relationship) => ({
-        id: relationship.id,
-        fromPersonId: relationship.fromPersonId,
-        toPersonId: relationship.toPersonId,
-        type: relationship.type,
-        note: relationship.note,
-        createdAt: relationship.createdAt.toISOString(),
-      })),
+    moderationQueue: canSeeModerationQueue
+      ? pendingRelationships.map((relationship) => ({
+          id: relationship.id,
+          fromPersonId: relationship.fromPersonId,
+          toPersonId: relationship.toPersonId,
+          type: relationship.type,
+          note: relationship.note,
+          createdAt: relationship.createdAt.toISOString(),
+        }))
+      : [],
   };
 
   return NextResponse.json(response);

@@ -152,10 +152,9 @@ function buildPersonNodeData(
     person,
     isSelected: person.id === selectedPersonId,
     isDimmed: !matchesQuery,
-    isPending: bundle.relationships.some(
+    isPending: bundle.moderationQueue.some(
       (relationship) =>
-        relationship.status === "PENDING" &&
-        (relationship.fromPersonId === person.id || relationship.toPersonId === person.id),
+        relationship.fromPersonId === person.id || relationship.toPersonId === person.id,
     ),
     viewMode,
   };

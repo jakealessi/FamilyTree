@@ -522,13 +522,13 @@ export function TreeWorkspace({
       token: parsed.token,
       personalToken: parsed.personalToken,
     };
+    setLoading(true);
     setSession(next);
     storeSession(slug, {
       token: parsed.token,
       personalToken: parsed.personalToken,
     });
     setError(null);
-    await refreshTree(next);
   }
 
   async function handleRecovery(event: React.FormEvent<HTMLFormElement>) {
@@ -566,12 +566,12 @@ export function TreeWorkspace({
         token: null,
         personalToken,
       };
+      setLoading(true);
       setSession(next);
       storeSession(slug, {
         token: null,
         personalToken,
       });
-      await refreshTree(next);
     } catch {
       setError("The recovery request failed before the server could respond. Check your connection and try again.");
     } finally {
