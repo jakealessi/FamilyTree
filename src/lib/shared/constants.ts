@@ -22,11 +22,6 @@ export const LIFE_STATUS_OPTIONS = [
   { value: "DECEASED", label: "Deceased" },
 ] as const;
 
-export const VIEW_MODE_OPTIONS = [
-  { value: "artistic", label: "Artistic tree" },
-  { value: "classic", label: "Classic diagram" },
-] as const;
-
 export const ROLE_LABELS: Record<string, string> = {
   OWNER: "Owner",
   CONTRIBUTOR: "Contributor",

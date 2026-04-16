@@ -3,11 +3,10 @@ import { NextResponse } from "next/server";
 
 import { personPayloadSchema } from "@/lib/shared/schemas";
 import { formatPersonName } from "@/lib/shared/utils";
-import { resolveTreeAccess } from "@/lib/server/access";
 import { prisma } from "@/lib/server/db";
 import { recordHistory } from "@/lib/server/history";
 import { canCreatePeople } from "@/lib/server/permissions";
-import { jsonError, parseJson, readRequestTokens } from "@/lib/server/request";
+import { jsonError, parseJson, resolveTreeAccessFromRequest } from "@/lib/server/request";
 import { personDataFromInput } from "@/lib/server/tree-service";
 
 type RouteContext = {
@@ -22,13 +21,7 @@ export async function POST(request: Request, context: RouteContext) {
     return jsonError("Invalid person payload.", 422, parsed.error.flatten());
   }
 
-  const tokens = readRequestTokens(request);
-  const access = await resolveTreeAccess({
-    slug,
-    token: tokens.token,
-    personalToken: tokens.personalToken,
-    browserToken: tokens.browserToken,
-  });
+  const access = await resolveTreeAccessFromRequest(request, slug);
 
   if (!access || !canCreatePeople(access.role)) {
     return jsonError("This link does not allow creating people.", 403);

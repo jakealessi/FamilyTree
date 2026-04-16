@@ -3,12 +3,22 @@ import { NextResponse } from "next/server";
 
 import { createTreeSchema } from "@/lib/shared/schemas";
 import { prisma } from "@/lib/server/db";
-import { jsonError, parseJson } from "@/lib/server/request";
+import { jsonError, parseJson, readTreeAuth } from "@/lib/server/request";
 import {
   buildTreeLink,
   generateOpaqueToken,
   generateTreeSlug,
+  hashToken,
 } from "@/lib/server/tokens";
+
+function isUniqueConstraintError(error: unknown) {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    error.code === "P2002"
+  );
+}
 
 async function createUniqueSlug(title: string) {
   for (let index = 0; index < 8; index += 1) {
@@ -33,15 +43,22 @@ export async function POST(request: Request) {
     return jsonError("Please check the create-tree form values.", 422, parsed.error.flatten());
   }
 
+  const auth = await readTreeAuth(request);
   const body = parsed.data;
-  const ownerToken = generateOpaqueToken("owner");
-  const contributorToken = generateOpaqueToken("contrib");
-  const viewerToken = body.generateViewerLink ? generateOpaqueToken("viewer") : null;
   const origin = new URL(request.url).origin;
+  const ownerBrowserTokenHash = body.ownerBrowserToken
+    ? hashToken(body.ownerBrowserToken)
+    : null;
   let tree = null;
+  let ownerToken: string | null = null;
+  let contributorToken: string | null = null;
+  let viewerToken: string | null = null;
 
   for (let attempt = 0; attempt < 8; attempt += 1) {
     const slug = await createUniqueSlug(body.title);
+    ownerToken = generateOpaqueToken("owner");
+    contributorToken = generateOpaqueToken("contrib");
+    viewerToken = body.generateViewerLink ? generateOpaqueToken("viewer") : null;
 
     try {
       tree = await prisma.familyTree.create({
@@ -53,6 +70,8 @@ export async function POST(request: Request) {
           ownerToken,
           contributorToken,
           viewerToken,
+          ownerBrowserTokenHash,
+          ownerUserId: auth.userId ?? null,
           moderationMode:
             body.moderationMode === "OPEN"
               ? ModerationMode.OPEN
@@ -61,12 +80,7 @@ export async function POST(request: Request) {
       });
       break;
     } catch (error) {
-      if (
-        typeof error === "object" &&
-        error !== null &&
-        "code" in error &&
-        error.code === "P2002"
-      ) {
+      if (isUniqueConstraintError(error)) {
         continue;
       }
 
@@ -79,19 +93,12 @@ export async function POST(request: Request) {
   }
 
   return NextResponse.json({
-    tree: {
-      id: tree.id,
-      slug: tree.slug,
-      title: tree.title,
-      subtitle: tree.subtitle,
-      description: tree.description,
-      moderationMode: tree.moderationMode,
-    },
+    slug: tree.slug,
     links: {
       stable: buildTreeLink(origin, tree.slug),
-      owner: buildTreeLink(origin, tree.slug, ownerToken),
-      contributor: buildTreeLink(origin, tree.slug, contributorToken),
+      edit: buildTreeLink(origin, tree.slug, contributorToken),
       viewer: viewerToken ? buildTreeLink(origin, tree.slug, viewerToken) : null,
+      legacyOwner: buildTreeLink(origin, tree.slug, ownerToken),
     },
   });
 }

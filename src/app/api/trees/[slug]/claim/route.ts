@@ -3,12 +3,12 @@ import { NextResponse } from "next/server";
 
 import { claimProfileSchema } from "@/lib/shared/schemas";
 import { formatPersonName } from "@/lib/shared/utils";
-import { resolveTreeAccess } from "@/lib/server/access";
 import { prisma } from "@/lib/server/db";
 import { recordHistory } from "@/lib/server/history";
 import { canEditTree } from "@/lib/server/permissions";
-import { jsonError, parseJson, readRequestTokens } from "@/lib/server/request";
+import { jsonError, parseJson, resolveTreeAccessFromRequest } from "@/lib/server/request";
 import {
+  accentColorFromToken,
   buildPersonalLink,
   generateRecoveryCode,
   generateOpaqueToken,
@@ -20,11 +20,6 @@ type RouteContext = {
   params: Promise<{ slug: string }>;
 };
 
-function accentColorFromToken(token: string) {
-  const digest = hashToken(token);
-  return `#${digest.slice(0, 6)}`;
-}
-
 export async function POST(request: Request, context: RouteContext) {
   const { slug } = await context.params;
   const parsed = await parseJson(request, claimProfileSchema);
@@ -33,15 +28,10 @@ export async function POST(request: Request, context: RouteContext) {
     return jsonError("Invalid claim payload.", 422, parsed.error.flatten());
   }
 
-  const tokens = readRequestTokens(request);
-  const access = await resolveTreeAccess({
-    slug,
-    token: tokens.token,
-    personalToken: tokens.personalToken,
-  });
+  const access = await resolveTreeAccessFromRequest(request, slug);
 
   if (!access || !canEditTree(access.role)) {
-    return jsonError("Only owner or contributor links can claim a profile.", 403);
+    return jsonError("Only editors with permission can claim a profile.", 403);
   }
 
   if (access.isArchived) {
@@ -133,7 +123,6 @@ export async function POST(request: Request, context: RouteContext) {
   });
 
   return NextResponse.json({
-    personId: person.id,
     recoveryCode,
     personalLink: buildPersonalLink(origin, access.tree.slug, personalToken),
   });

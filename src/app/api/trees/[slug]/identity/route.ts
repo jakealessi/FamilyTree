@@ -1,20 +1,15 @@
 import { NextResponse } from "next/server";
 
 import { resolveIdentitySchema } from "@/lib/shared/schemas";
-import { resolveTreeAccess } from "@/lib/server/access";
 import { prisma } from "@/lib/server/db";
 import { canEditTree } from "@/lib/server/permissions";
-import { jsonError, parseJson, readRequestTokens } from "@/lib/server/request";
-import { hashToken } from "@/lib/server/tokens";
+import { jsonError, parseJson, readTreeAuth } from "@/lib/server/request";
+import { resolveTreeAccess } from "@/lib/server/access";
+import { accentColorFromToken, hashToken } from "@/lib/server/tokens";
 
 type RouteContext = {
   params: Promise<{ slug: string }>;
 };
-
-function accentColorFromToken(token: string) {
-  const digest = hashToken(token);
-  return `#${digest.slice(0, 6)}`;
-}
 
 export async function POST(request: Request, context: RouteContext) {
   const { slug } = await context.params;
@@ -24,11 +19,13 @@ export async function POST(request: Request, context: RouteContext) {
     return jsonError("Invalid editor identity payload.", 422, parsed.error.flatten());
   }
 
-  const tokens = readRequestTokens(request);
+  const headerAuth = await readTreeAuth(request);
   const access = await resolveTreeAccess({
     slug,
-    token: tokens.token,
-    personalToken: tokens.personalToken,
+    token: headerAuth.token,
+    personalToken: headerAuth.personalToken,
+    browserToken: headerAuth.browserToken ?? parsed.data.browserToken,
+    userId: headerAuth.userId,
   });
 
   if (!access || (!canEditTree(access.role) && access.role !== "PERSONAL")) {

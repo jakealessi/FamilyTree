@@ -8,20 +8,25 @@ import {
 } from "react";
 import Link from "next/link";
 import {
+  AlertCircle,
   ArchiveRestore,
-  Compass,
+  GitBranch,
+  Loader2,
   Lock,
+  PencilLine,
   Plus,
   RotateCcw,
   Search,
   Share2,
-  Sparkles,
+  Trash2,
+  X,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Input, fieldClassName } from "@/components/ui/input";
+import { TreeAccountPanel } from "@/components/auth-form";
 import { PersonEditorPanel } from "@/components/tree/person-editor-panel";
 import { ShareLinksCard } from "@/components/tree/share-links-card";
 import {
@@ -32,12 +37,20 @@ import {
   storeEditorName,
   storeSession,
 } from "@/lib/client/local-identity";
-import { ROLE_LABELS, RELATIONSHIP_OPTIONS, VIEW_MODE_OPTIONS } from "@/lib/shared/constants";
-import type { StarterSpacePreset } from "@/lib/shared/starter-spaces";
-import { formatPersonName } from "@/lib/shared/utils";
-import type { TreeBundle, WorkspaceViewMode } from "@/types/family-tree";
+import { readResponseJson } from "@/lib/client/response-json";
+import {
+  LIFE_STATUS_OPTIONS,
+  ROLE_LABELS,
+  RELATIONSHIP_OPTIONS,
+} from "@/lib/shared/constants";
+import { formatBranchLabel, formatPersonName } from "@/lib/shared/utils";
+import type { TreeBundle } from "@/types/family-tree";
 
-import { FamilyFlow } from "./family-flow";
+import { FamilyBracket } from "./family-bracket";
+
+function fetchWithCred(input: RequestInfo | URL, init?: RequestInit) {
+  return globalThis.fetch(input, { ...init, credentials: "include" });
+}
 
 type TreeWorkspaceProps = {
   slug: string;
@@ -57,7 +70,19 @@ type ClaimResult = {
   personalLink: string;
 };
 
+type LifeStatusFilter = "ALL" | "UNKNOWN" | "LIVING" | "DECEASED";
+type ClaimFilter = "ALL" | "CLAIMED" | "UNCLAIMED";
+
 const NEW_PERSON_ID = "__new_person__";
+
+function createRelationshipDraft(fromPersonId?: string | null) {
+  return {
+    fromPersonId: fromPersonId ?? "",
+    toPersonId: "",
+    type: "PARENT",
+    note: "",
+  };
+}
 
 function personalTokenFromLink(url: string) {
   return new URL(url).searchParams.get("personal");
@@ -115,6 +140,13 @@ function isRollbackSupported(entry: TreeBundle["history"][number]) {
   return false;
 }
 
+function relationshipTypeLabel(type: string) {
+  return (
+    RELATIONSHIP_OPTIONS.find((option) => option.value === type)?.label ??
+    type.toLowerCase().replace(/_/g, " ")
+  );
+}
+
 export function TreeWorkspace({
   slug,
   initialToken = null,
@@ -129,21 +161,24 @@ export function TreeWorkspace({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedPersonId, setSelectedPersonId] = useState<string | null>(null);
-  const [starterPreset, setStarterPreset] = useState<StarterSpacePreset | null>(null);
-  const [viewMode, setViewMode] = useState<WorkspaceViewMode>("artistic");
   const [search, setSearch] = useState("");
   const [accessCode, setAccessCode] = useState("");
   const [recoveryCode, setRecoveryCode] = useState("");
   const [editorName, setEditorName] = useState("");
-  const [relationshipDraft, setRelationshipDraft] = useState({
-    fromPersonId: "",
-    toPersonId: "",
-    type: "PARENT",
-    note: "",
-  });
+  const [lifeStatusFilter, setLifeStatusFilter] = useState<LifeStatusFilter>("ALL");
+  const [claimFilter, setClaimFilter] = useState<ClaimFilter>("ALL");
+  const [branchFilter, setBranchFilter] = useState("ALL");
+  const [relationshipDraft, setRelationshipDraft] = useState(createRelationshipDraft());
+  const [editingRelationshipId, setEditingRelationshipId] = useState<string | null>(null);
   const [claimResult, setClaimResult] = useState<ClaimResult | null>(null);
   const [busyMessage, setBusyMessage] = useState<string | null>(null);
+  const [nameGateOpen, setNameGateOpen] = useState(false);
+  const [nameGateDraft, setNameGateDraft] = useState("");
   const deferredSearch = useDeferredValue(search);
+
+  const branchOptions = bundle
+    ? ["ALL", ...new Set(bundle.people.map((person) => person.branchKey ?? "UNASSIGNED"))]
+    : ["ALL"];
 
   useEffect(() => {
     const stored = getStoredSession(slug);
@@ -177,7 +212,11 @@ export function TreeWorkspace({
   }, [initialPersonalToken, initialToken, slug]);
 
   useEffect(() => {
-    if (!session.token && !session.personalToken && !session.editorToken) {
+    const canAttempt =
+      Boolean(session.token) || Boolean(session.personalToken) || Boolean(session.editorToken);
+    if (!canAttempt) {
+      setLoading(false);
+      setBundle(null);
       return;
     }
 
@@ -187,7 +226,6 @@ export function TreeWorkspace({
       editorToken: session.editorToken,
     });
     // `refreshTree` intentionally reads the latest editor name and session state.
-    // Re-running on its identity would create a fetch loop.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session.personalToken, session.token, session.editorToken]);
 
@@ -195,18 +233,33 @@ export function TreeWorkspace({
     ? []
     : (() => {
         const query = deferredSearch.trim().toLowerCase();
-        if (!query) {
-          return bundle.people;
-        }
-
         return bundle.people.filter((person) =>
-          [formatPersonName(person), person.currentCity, person.occupation]
-            .filter(Boolean)
-            .join(" ")
-            .toLowerCase()
-            .includes(query),
+          {
+            const matchesQuery =
+              query.length === 0 ||
+              [formatPersonName(person), person.currentCity, person.occupation]
+                .filter(Boolean)
+                .join(" ")
+                .toLowerCase()
+                .includes(query);
+            const matchesLifeStatus =
+              lifeStatusFilter === "ALL" || person.lifeStatus === lifeStatusFilter;
+            const matchesClaim =
+              claimFilter === "ALL" ||
+              (claimFilter === "CLAIMED" ? Boolean(person.claimedBy) : !person.claimedBy);
+            const effectiveBranchKey = person.branchKey ?? "UNASSIGNED";
+            const matchesBranch =
+              branchFilter === "ALL" || effectiveBranchKey === branchFilter;
+
+            return matchesQuery && matchesLifeStatus && matchesClaim && matchesBranch;
+          },
         );
       })();
+  const filteredPersonIds = filteredPeople.map((person) => person.id);
+  const filtersActive =
+    lifeStatusFilter !== "ALL" || claimFilter !== "ALL" || branchFilter !== "ALL";
+  const searchActive = deferredSearch.trim().length > 0;
+  const viewNarrowed = filtersActive || searchActive;
 
   useEffect(() => {
     if (!bundle) {
@@ -242,6 +295,30 @@ export function TreeWorkspace({
     }
   }, [claimResult, selectedPersonId]);
 
+  useEffect(() => {
+    if (!bundle || !editingRelationshipId) {
+      return;
+    }
+
+    const relationshipStillExists = bundle.relationships.some(
+      (relationship) => relationship.id === editingRelationshipId,
+    );
+
+    if (!relationshipStillExists) {
+      setEditingRelationshipId(null);
+      setRelationshipDraft(createRelationshipDraft());
+    }
+  }, [bundle, editingRelationshipId]);
+
+  useEffect(() => {
+    if (bundle?.myEditor?.needsNamePrompt) {
+      setNameGateOpen(true);
+      setNameGateDraft((current) => current || getStoredEditorName(slug));
+    } else {
+      setNameGateOpen(false);
+    }
+  }, [bundle?.myEditor?.needsNamePrompt, slug]);
+
   const selectedPerson =
     selectedPersonId === NEW_PERSON_ID
       ? null
@@ -261,13 +338,26 @@ export function TreeWorkspace({
     Boolean(selectedPerson) &&
     !selectedPerson?.claimedBy &&
     (bundle?.access.role === "OWNER" || bundle?.access.role === "CONTRIBUTOR");
+  const canManageExistingRelationships =
+    bundle?.access.role === "OWNER" ||
+    (bundle?.access.role === "CONTRIBUTOR" && bundle.tree.moderationMode === "OPEN");
+  const relationshipScopePersonId =
+    selectedPersonId && selectedPersonId !== NEW_PERSON_ID ? selectedPersonId : null;
+  const visibleRelationships = bundle
+    ? bundle.relationships.filter((relationship) =>
+        relationshipScopePersonId
+          ? relationship.fromPersonId === relationshipScopePersonId ||
+            relationship.toPersonId === relationshipScopePersonId
+          : true,
+      )
+    : [];
 
   async function refreshTree(nextSession: SessionState) {
     setLoading(true);
     setError(null);
 
     try {
-      const response = await fetch(`/api/trees/${slug}`, {
+      const response = await fetchWithCred(`/api/trees/${slug}`, {
         headers: {
           ...(nextSession.token ? { "x-tree-token": nextSession.token } : {}),
           ...(nextSession.personalToken
@@ -279,11 +369,16 @@ export function TreeWorkspace({
         },
       });
 
-      const json = (await response.json()) as TreeBundle & { error?: string };
+      const json = await readResponseJson<TreeBundle & { error?: string }>(response);
 
       if (!response.ok) {
         setBundle(null);
-        setError(json.error ?? "This tree could not be opened.");
+        setError(json?.error ?? "This tree could not be opened.");
+        return;
+      }
+      if (!json) {
+        setBundle(null);
+        setError("This tree could not be loaded (empty response).");
         return;
       }
 
@@ -295,7 +390,7 @@ export function TreeWorkspace({
           json.access.role === "CONTRIBUTOR" ||
           json.access.role === "PERSONAL")
       ) {
-        await fetch(`/api/trees/${slug}/identity`, {
+        await fetchWithCred(`/api/trees/${slug}/identity`, {
           method: "POST",
           headers: {
             "content-type": "application/json",
@@ -339,15 +434,17 @@ export function TreeWorkspace({
 
       if (!response.ok) {
         setError(json.error ?? `Could not ${label.toLowerCase()}.`);
-        return;
+        return false;
       }
 
       onSuccess?.(json);
       startTransition(() => {
         void refreshTree(session);
       });
+      return true;
     } catch {
       setError("That request failed before the server could respond. Check your connection and try again.");
+      return false;
     } finally {
       setBusyMessage(null);
     }
@@ -362,7 +459,7 @@ export function TreeWorkspace({
     await runAction(
       selectedPerson ? "Saving profile" : "Creating profile",
       () =>
-        fetch(endpoint, {
+        fetchWithCred(endpoint, {
           method,
           headers: {
             "content-type": "application/json",
@@ -373,7 +470,6 @@ export function TreeWorkspace({
       (responsePayload) => {
         const nextPerson = (responsePayload as { person?: { id: string } }).person;
         if (!selectedPerson && nextPerson?.id) {
-          setStarterPreset(null);
           setSelectedPersonId(nextPerson.id);
         }
       },
@@ -386,7 +482,7 @@ export function TreeWorkspace({
     }
 
     await runAction("Archiving profile", () =>
-      fetch(`/api/trees/${slug}/people/${selectedPerson.id}`, {
+      fetchWithCred(`/api/trees/${slug}/people/${selectedPerson.id}`, {
         method: "DELETE",
         headers: requestHeaders(),
       }),
@@ -394,14 +490,21 @@ export function TreeWorkspace({
   }
 
   async function handleClaim() {
-    if (!selectedPerson || !session.editorToken) {
+    if (!selectedPerson) {
+      return;
+    }
+
+    if (!session.editorToken) {
+      setError(
+        "This browser could not create a local editor identity. Enable browser storage and try claiming the profile again.",
+      );
       return;
     }
 
     await runAction(
       "Claiming profile",
       () =>
-        fetch(`/api/trees/${slug}/claim`, {
+        fetchWithCred(`/api/trees/${slug}/claim`, {
           method: "POST",
           headers: {
             "content-type": "application/json",
@@ -428,7 +531,7 @@ export function TreeWorkspace({
     type: "PROFILE" | "GALLERY";
   }) {
     if (!selectedPerson) {
-      return;
+      return false;
     }
 
     const formData = new FormData();
@@ -444,8 +547,8 @@ export function TreeWorkspace({
       formData.set("file", payload.file);
     }
 
-    await runAction("Uploading media", () =>
-      fetch(`/api/trees/${slug}/media`, {
+    return runAction("Uploading media", () =>
+      fetchWithCred(`/api/trees/${slug}/media`, {
         method: "POST",
         headers: requestHeaders(),
         body: formData,
@@ -456,23 +559,56 @@ export function TreeWorkspace({
   async function handleCreateRelationship(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    await runAction("Saving relationship", () =>
-      fetch(`/api/trees/${slug}/relationships`, {
-        method: "POST",
+    const endpoint = editingRelationshipId
+      ? `/api/trees/${slug}/relationships/${editingRelationshipId}`
+      : `/api/trees/${slug}/relationships`;
+    const method = editingRelationshipId ? "PATCH" : "POST";
+
+    await runAction(editingRelationshipId ? "Updating relationship" : "Saving relationship", () =>
+      fetchWithCred(endpoint, {
+        method,
         headers: {
           "content-type": "application/json",
           ...requestHeaders(),
         },
         body: JSON.stringify(relationshipDraft),
       }),
+      () => {
+        setEditingRelationshipId(null);
+        setRelationshipDraft(createRelationshipDraft(relationshipScopePersonId));
+      },
     );
+  }
+
+  async function handleDeleteRelationship(relationshipId: string) {
+    await runAction("Removing relationship", () =>
+      fetchWithCred(`/api/trees/${slug}/relationships/${relationshipId}`, {
+        method: "DELETE",
+        headers: requestHeaders(),
+      }),
+    );
+  }
+
+  function startNewRelationship() {
+    setEditingRelationshipId(null);
+    setRelationshipDraft(createRelationshipDraft(relationshipScopePersonId));
+  }
+
+  function handleEditRelationship(relationship: TreeBundle["relationships"][number]) {
+    setEditingRelationshipId(relationship.id);
+    setRelationshipDraft({
+      fromPersonId: relationship.fromPersonId,
+      toPersonId: relationship.toPersonId,
+      type: relationship.type,
+      note: relationship.note ?? "",
+    });
   }
 
   async function handleModeration(relationshipId: string, decision: "approve" | "reject") {
     await runAction(
       decision === "approve" ? "Approving change" : "Rejecting change",
       () =>
-        fetch(`/api/trees/${slug}/moderation/${relationshipId}`, {
+        fetchWithCred(`/api/trees/${slug}/moderation/${relationshipId}`, {
           method: "POST",
           headers: {
             "content-type": "application/json",
@@ -485,7 +621,7 @@ export function TreeWorkspace({
 
   async function handleRollback(historyId: string) {
     await runAction("Rolling back change", () =>
-      fetch(`/api/trees/${slug}/rollback`, {
+      fetchWithCred(`/api/trees/${slug}/rollback`, {
         method: "POST",
         headers: {
           "content-type": "application/json",
@@ -498,7 +634,7 @@ export function TreeWorkspace({
 
   async function handleReactivate() {
     await runAction("Reactivating tree", () =>
-      fetch(`/api/trees/${slug}/reactivate`, {
+      fetchWithCred(`/api/trees/${slug}/reactivate`, {
         method: "POST",
         headers: {
           "content-type": "application/json",
@@ -509,11 +645,11 @@ export function TreeWorkspace({
     );
   }
 
-  async function handleUnlock(event: React.FormEvent<HTMLFormElement>) {
+  function handleUnlock(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const parsed = parseAccessInput(accessCode);
     if (!parsed.token && !parsed.personalToken) {
-      setError("Paste a valid owner, contributor, viewer, or personal share link.");
+      setError("Paste a valid edit link, view link, or personal token.");
       return;
     }
 
@@ -537,21 +673,21 @@ export function TreeWorkspace({
     setError(null);
 
     try {
-      const response = await fetch(`/api/trees/${slug}/claim/recover`, {
+      const response = await fetchWithCred(`/api/trees/${slug}/claim/recover`, {
         method: "POST",
         headers: {
           "content-type": "application/json",
         },
         body: JSON.stringify({
           recoveryCode,
-          browserToken: session.editorToken,
+          ...(session.editorToken ? { browserToken: session.editorToken } : {}),
           displayName: editorName || null,
         }),
       });
 
-      const json = (await response.json()) as { error?: string; personalLink?: string };
-      if (!response.ok || !json.personalLink) {
-        setError(json.error ?? "Recovery code was not accepted.");
+      const json = await readResponseJson<{ error?: string; personalLink?: string }>(response);
+      if (!response.ok || !json?.personalLink) {
+        setError(json?.error ?? "Recovery code was not accepted.");
         return;
       }
 
@@ -586,13 +722,59 @@ export function TreeWorkspace({
     });
   }
 
+  async function handleNameGateSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const name = nameGateDraft.trim();
+    if (!name || !session.editorToken) {
+      return;
+    }
+    setEditorName(name);
+    storeEditorName(slug, name);
+    setBusyMessage("Saving your name");
+    setError(null);
+    try {
+      const response = await fetchWithCred(`/api/trees/${slug}/identity`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          ...(session.token ? { "x-tree-token": session.token } : {}),
+          ...(session.personalToken ? { "x-personal-token": session.personalToken } : {}),
+        },
+        body: JSON.stringify({
+          browserToken: session.editorToken,
+          displayName: name,
+        }),
+      });
+      if (!response.ok) {
+        const json = (await response.json().catch(() => ({}))) as { error?: string };
+        setError(json.error ?? "Could not save your name.");
+        return;
+      }
+      setNameGateOpen(false);
+      await refreshTree(session);
+    } finally {
+      setBusyMessage(null);
+    }
+  }
+
+  function personNameForId(personId: string) {
+    const person = bundle?.people.find((candidate) => candidate.id === personId);
+    return formatPersonName(person ?? { firstName: "Unknown" });
+  }
+
   if (loading && !bundle) {
     return (
       <div className="mx-auto flex min-h-[70vh] max-w-6xl items-center justify-center px-4">
-        <Card className="w-full max-w-xl text-center">
-          <p className="text-lg font-semibold text-[var(--ink-strong)]">Opening the family tree...</p>
+        <Card className="w-full max-w-xl p-8 text-center">
+          <div
+            className="mx-auto mb-5 flex size-12 items-center justify-center rounded-full border-2 border-[color:var(--border-soft)] border-t-[var(--brand-forest)] ui-spinner"
+            role="status"
+            aria-busy="true"
+            aria-live="polite"
+          />
+          <p className="text-lg font-semibold text-[var(--ink-strong)]">Opening your family tree</p>
           <p className="mt-2 text-sm text-[var(--ink-soft)]">
-            Connecting the secure link, loading relatives, and preparing both tree views.
+            Verifying your link and loading people and relationships.
           </p>
         </Card>
       </div>
@@ -607,13 +789,13 @@ export function TreeWorkspace({
             Stable private URL
           </Badge>
           <h1 className="text-4xl font-semibold tracking-[-0.04em] text-[var(--ink-strong)]">
-            This family tree is locked until you add a share token or recover a personal link.
+            This family tree needs an invite link or recovery code.
           </h1>
           <p className="text-base leading-8 text-[var(--ink-soft)]">
-            Trees stay private by default. Paste an owner, contributor, or viewer token from your
-            share link, or use a personal recovery code to reopen the profile you claimed before.
+            Paste an edit link or view-only link you were sent, or recover a personal link with the
+            code from when you claimed a profile.
           </p>
-          <div className="rounded-3xl border border-[color:var(--border-soft)] bg-white/70 p-4 text-sm text-[var(--ink-soft)]">
+          <div className="rounded-lg border border-[color:var(--border-soft)] bg-white/70 p-4 text-sm text-[var(--ink-soft)]">
             The stable URL for this tree is
             <span className="mx-1 font-semibold text-[var(--ink-strong)]">{slug}</span>
             and it can be reused forever as long as the tree stays active.
@@ -627,13 +809,13 @@ export function TreeWorkspace({
         <div className="space-y-6">
           <Card>
             <div className="mb-4 flex items-center gap-3">
-              <div className="flex size-10 items-center justify-center rounded-2xl bg-[color:rgba(42,74,47,0.1)] text-[var(--brand-forest)]">
+              <div className="flex size-10 items-center justify-center rounded-lg bg-[color:rgba(42,74,47,0.1)] text-[var(--brand-forest)]">
                 <Lock className="size-5" />
               </div>
               <div>
-                <h2 className="font-semibold text-[var(--ink-strong)]">Use a share token</h2>
+                <h2 className="font-semibold text-[var(--ink-strong)]">Use an invite link</h2>
                 <p className="text-sm text-[var(--ink-muted)]">
-                  Paste the token from any owner, contributor, or viewer link.
+                  Paste a full URL, or the token from an edit or view link.
                 </p>
               </div>
             </div>
@@ -641,7 +823,7 @@ export function TreeWorkspace({
               <Input
                 value={accessCode}
                 onChange={(event) => setAccessCode(event.target.value)}
-                placeholder="owner_xxx or contrib_xxx"
+                placeholder="https://… or contrib_…"
               />
               <Button type="submit" className="w-full">
                 Unlock tree
@@ -651,7 +833,7 @@ export function TreeWorkspace({
 
           <Card>
             <div className="mb-4 flex items-center gap-3">
-              <div className="flex size-10 items-center justify-center rounded-2xl bg-[color:rgba(227,182,97,0.18)] text-[var(--brand-forest)]">
+              <div className="flex size-10 items-center justify-center rounded-lg bg-[color:rgba(227,182,97,0.18)] text-[var(--brand-forest)]">
                 <ArchiveRestore className="size-5" />
               </div>
               <div>
@@ -685,21 +867,10 @@ export function TreeWorkspace({
   return (
     <div className="min-h-screen pb-12">
       <div className="mx-auto max-w-[1440px] px-4 py-6 md:px-6">
-        <Card className="mb-6 overflow-hidden p-0">
-          <div className="relative">
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(227,182,97,0.28),_transparent_38%),radial-gradient(circle_at_top_right,_rgba(107,143,84,0.2),_transparent_42%)]" />
-            <div className="relative flex flex-col gap-6 p-6 md:p-8">
-              <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-                <div className="space-y-3">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Badge>{ROLE_LABELS[bundle.access.role ?? "VIEWER"] ?? "Private tree"}</Badge>
-                    <Badge className="bg-[color:rgba(42,74,47,0.08)] text-[var(--brand-forest)]">
-                      {bundle.people.length} people
-                    </Badge>
-                    <Badge className="bg-[color:rgba(227,182,97,0.16)] text-[#8D642A]">
-                      {bundle.relationships.length} connections
-                    </Badge>
-                  </div>
+        <Card className="mb-6 p-6 md:p-8">
+          <div className="flex flex-col gap-6">
+              <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px] xl:items-start">
+                <div className="space-y-4">
                   <div>
                     <h1 className="text-3xl font-semibold tracking-[-0.04em] text-[var(--ink-strong)] md:text-5xl">
                       {bundle.tree.title}
@@ -707,89 +878,133 @@ export function TreeWorkspace({
                     {bundle.tree.subtitle ? (
                       <p className="mt-2 text-base text-[var(--ink-soft)]">{bundle.tree.subtitle}</p>
                     ) : null}
+                    <p className="mt-3 text-sm text-[var(--ink-muted)]">
+                      <span className="font-medium text-[var(--ink-strong)]">
+                        {ROLE_LABELS[bundle.access.role ?? "VIEWER"] ?? "Private tree"}
+                      </span>
+                      <span aria-hidden> · </span>
+                      {bundle.people.length} people
+                      <span aria-hidden> · </span>
+                      {bundle.relationships.length} links
+                      <span aria-hidden> · </span>
+                      {bundle.tree.moderationMode === "REVIEW_STRUCTURE"
+                        ? "Edits reviewed"
+                        : "Open collaboration"}
+                      {bundle.access.role === "OWNER" && bundle.account?.linkedToUser ? (
+                        <>
+                          <span aria-hidden> · </span>
+                          <span className="text-[var(--brand-forest)]">On your account</span>
+                        </>
+                      ) : null}
+                    </p>
                     {bundle.tree.description ? (
                       <p className="mt-3 max-w-3xl text-sm leading-7 text-[var(--ink-muted)]">
                         {bundle.tree.description}
                       </p>
                     ) : null}
                   </div>
-                </div>
-
-                <div className="grid gap-3 md:grid-cols-[minmax(220px,1fr)_auto_auto]">
-                  <div className="relative">
-                    <Search className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-[var(--ink-muted)]" />
-                    <Input
-                      value={search}
-                      onChange={(event) => setSearch(event.target.value)}
-                      placeholder="Search by name, city, or occupation"
-                      className="pl-10"
-                    />
+                  <div className="grid gap-3 md:grid-cols-[minmax(220px,1fr)_auto]">
+                    <div className="relative">
+                      <Search className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-[var(--ink-muted)]" />
+                      <Input
+                        value={search}
+                        onChange={(event) => setSearch(event.target.value)}
+                        placeholder="Search by name, city, or occupation"
+                        className="pl-10"
+                      />
+                    </div>
+                    <Button
+                      variant="outline"
+                      className="gap-2"
+                      onClick={() => {
+                        setSelectedPersonId(NEW_PERSON_ID);
+                        setClaimResult(null);
+                      }}
+                      disabled={!canCreatePeople}
+                      title={
+                        canCreatePeople
+                          ? "Create a new profile in this tree"
+                          : "You need edit access (owner or collaborator link) to add people."
+                      }
+                    >
+                      <Plus className="size-4" />
+                      Add person
+                    </Button>
                   </div>
-                  <select
-                    value={viewMode}
-                    onChange={(event) => setViewMode(event.target.value as WorkspaceViewMode)}
-                    className={fieldClassName}
-                  >
-                    {VIEW_MODE_OPTIONS.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                  <Button
-                    variant="outline"
-                    className="gap-2"
-                    onClick={() => {
-                      setStarterPreset(null);
-                      setSelectedPersonId(NEW_PERSON_ID);
-                      setClaimResult(null);
-                    }}
-                    disabled={!canCreatePeople}
-                  >
-                    <Plus className="size-4" />
-                    Add person
-                  </Button>
                 </div>
-              </div>
 
-              <div className="flex flex-wrap items-center gap-3">
-                <Input
-                  value={editorName}
-                  onChange={(event) => setEditorName(event.target.value)}
-                  placeholder="How should this browser appear in the edit history?"
-                  className="max-w-md"
-                />
-                <Button variant="outline" onClick={handleEditorNameSave}>
-                  Save browser identity
-                </Button>
-                <Button
-                  variant="ghost"
-                  onClick={() => {
-                    clearStoredSession(slug);
-                    setStarterPreset(null);
-                    setSelectedPersonId(null);
-                    setClaimResult(null);
-                    setError(null);
-                    setBundle(null);
-                    setSession({
-                      token: null,
-                      personalToken: null,
-                      editorToken: getOrCreateEditorToken(slug),
-                    });
-                  }}
-                >
-                  Forget this link on this device
-                </Button>
+                <div className="rounded-lg border border-[color:var(--border-soft)] bg-[color:rgba(255,255,255,0.75)] p-4">
+                  <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ink-muted)]">
+                    <Lock className="size-3.5 text-[var(--brand-forest)]" aria-hidden />
+                    Your editor name
+                  </div>
+                  <p className="mt-1.5 text-sm text-[var(--ink-soft)]">
+                    For the activity log. Saved on this device.
+                  </p>
+                  <div className="mt-4 space-y-3">
+                    <div className="relative">
+                      <Input
+                        value={editorName}
+                        onChange={(event) => setEditorName(event.target.value)}
+                        placeholder="e.g. Alex (cousin)"
+                      />
+                    </div>
+                    <div className="flex flex-wrap gap-3">
+                      <Button variant="outline" onClick={handleEditorNameSave}>
+                        Save name
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        onClick={() => {
+                          clearStoredSession(slug);
+                          setSelectedPersonId(null);
+                          setClaimResult(null);
+                          setError(null);
+                          setBundle(null);
+                          setSession({
+                            token: null,
+                            personalToken: null,
+                            editorToken: getOrCreateEditorToken(slug),
+                          });
+                        }}
+                      >
+                        Forget this device
+                      </Button>
+                    </div>
+                    {bundle.access.role === "OWNER" && bundle.account ? (
+                      <div className="border-t border-[color:var(--border-soft)] pt-4">
+                        <TreeAccountPanel
+                          slug={slug}
+                          linkedToUser={bundle.account.linkedToUser}
+                          onLinked={() => {
+                            startTransition(() => {
+                              void refreshTree(session);
+                            });
+                          }}
+                        />
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
               </div>
 
               {bundle.access.isArchived ? (
-                <div className="rounded-3xl border border-[color:rgba(227,182,97,0.4)] bg-[color:rgba(255,244,223,0.88)] p-4 text-sm text-[var(--ink-strong)]">
+                <div
+                  className="rounded-lg border border-[color:var(--border-soft)] bg-[color:rgba(0,0,0,0.03)] p-4 text-sm text-[var(--ink-strong)]"
+                  role="status"
+                >
                   <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                    <div>
-                      <p className="font-semibold">This tree is archived after 24 months of inactivity.</p>
-                      <p className="mt-1 text-[var(--ink-soft)]">
-                        Owner links and admin recovery can reactivate it without losing data.
-                      </p>
+                    <div className="flex gap-3">
+                      <ArchiveRestore
+                        className="mt-0.5 size-5 shrink-0 text-[var(--ink-muted)]"
+                        aria-hidden
+                      />
+                      <div>
+                        <p className="font-semibold">Archived after long inactivity.</p>
+                        <p className="mt-1 text-[var(--ink-soft)]">
+                          Owners can reactivate without losing data.
+                        </p>
+                      </div>
                     </div>
                     {bundle.access.role === "OWNER" ? (
                       <Button variant="secondary" onClick={handleReactivate}>
@@ -800,45 +1015,98 @@ export function TreeWorkspace({
                 </div>
               ) : null}
 
-              {error ? <p className="text-sm text-[#9A4136]">{error}</p> : null}
-              {busyMessage ? (
-                <p className="text-sm text-[var(--brand-forest)]">{busyMessage}...</p>
+              {error ? (
+                <div
+                  role="alert"
+                  className="flex gap-3 rounded-lg border border-[#d4a59a] bg-[color:var(--state-danger-bg)] px-4 py-3 text-sm text-[color:var(--state-danger-text)]"
+                >
+                  <AlertCircle className="size-5 shrink-0" aria-hidden />
+                  <p>{error}</p>
+                </div>
               ) : null}
-            </div>
-          </div>
+              {busyMessage ? (
+                <div
+                  role="status"
+                  aria-live="polite"
+                  className="flex items-center gap-3 rounded-lg border border-[color:var(--border-soft)] bg-[color:var(--state-info-bg)] px-4 py-3 text-sm text-[var(--ink-strong)]"
+                >
+                  <Loader2 className="ui-spinner size-5 shrink-0 text-[var(--brand-forest)]" aria-hidden />
+                  <span className="font-medium">{busyMessage}…</span>
+                </div>
+              ) : null}
+              </div>
         </Card>
 
         <div className="grid gap-6 xl:grid-cols-[minmax(0,1.75fr)_420px]">
           <div className="space-y-6">
             <Card className="space-y-4">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <h2 className="text-xl font-semibold text-[var(--ink-strong)]">
-                    {viewMode === "artistic" ? "Artistic tree view" : "Classic diagram view"}
-                  </h2>
-                  <p className="text-sm text-[var(--ink-muted)]">
-                    Click any person node to open the full profile editor.
-                  </p>
-                </div>
-                <div className="flex items-center gap-2 text-sm text-[var(--ink-soft)]">
-                  <Compass className="size-4" />
-                  Organic and readable from the same source of truth
-                </div>
+              <div className="flex flex-wrap items-end justify-between gap-2">
+                <h2 className="text-lg font-semibold text-[var(--ink-strong)]">Bracket</h2>
+                <p className="text-sm text-[var(--ink-muted)]">
+                  {viewNarrowed ? (
+                    <>
+                      Filtered: {filteredPeople.length} of {bundle.people.length}
+                    </>
+                  ) : (
+                    <>{bundle.people.length} people</>
+                  )}
+                </p>
               </div>
-              <FamilyFlow
+              <div className="grid gap-3 border-t border-[color:var(--border-soft)] pt-4 md:grid-cols-[repeat(3,minmax(0,1fr))_auto]">
+                <select
+                  value={lifeStatusFilter}
+                  onChange={(event) =>
+                    setLifeStatusFilter(event.target.value as LifeStatusFilter)
+                  }
+                  className={fieldClassName}
+                >
+                  <option value="ALL">All life statuses</option>
+                  {LIFE_STATUS_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  value={claimFilter}
+                  onChange={(event) => setClaimFilter(event.target.value as ClaimFilter)}
+                  className={fieldClassName}
+                >
+                  <option value="ALL">All claim states</option>
+                  <option value="CLAIMED">Claimed only</option>
+                  <option value="UNCLAIMED">Unclaimed only</option>
+                </select>
+                <select
+                  value={branchFilter}
+                  onChange={(event) => setBranchFilter(event.target.value)}
+                  className={fieldClassName}
+                >
+                  {branchOptions.map((option) => (
+                    <option key={option} value={option}>
+                      {option === "ALL" ? "All branches" : formatBranchLabel(option)}
+                    </option>
+                  ))}
+                </select>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setLifeStatusFilter("ALL");
+                    setClaimFilter("ALL");
+                    setBranchFilter("ALL");
+                  }}
+                  disabled={!filtersActive}
+                >
+                  Clear filters
+                </Button>
+              </div>
+              <FamilyBracket
                 bundle={bundle}
-                viewMode={viewMode}
-                searchQuery={deferredSearch}
+                visiblePersonIds={filteredPersonIds}
                 selectedPersonId={selectedPersonId}
                 canCreatePeople={canCreatePeople}
                 onSelectPerson={(personId) => {
-                  setStarterPreset(null);
                   setSelectedPersonId(personId);
-                }}
-                onSelectStarter={(preset) => {
-                  setStarterPreset(preset);
-                  setSelectedPersonId(NEW_PERSON_ID);
-                  setClaimResult(null);
                 }}
               />
             </Card>
@@ -846,17 +1114,48 @@ export function TreeWorkspace({
             <div className="grid gap-6 xl:grid-cols-2">
               <Card className="space-y-4">
                 <div className="flex items-center gap-3">
-                  <div className="flex size-10 items-center justify-center rounded-2xl bg-[color:rgba(42,74,47,0.1)] text-[var(--brand-forest)]">
-                    <Sparkles className="size-5" />
+                  <div className="flex size-10 items-center justify-center rounded-lg bg-[color:rgba(42,74,47,0.1)] text-[var(--brand-forest)]">
+                    <GitBranch className="size-5" />
                   </div>
                   <div>
-                    <h3 className="text-lg font-semibold text-[var(--ink-strong)]">
-                      Connect relatives
-                    </h3>
+                    <h3 className="text-lg font-semibold text-[var(--ink-strong)]">Relationships</h3>
                     <p className="text-sm text-[var(--ink-muted)]">
-                      Structural edits can be moderated before they go live.
+                      Create new connections and maintain the ones already in the tree.
                     </p>
                   </div>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  {relationshipScopePersonId ? (
+                    <Badge className="bg-[color:rgba(42,74,47,0.08)] text-[var(--brand-forest)]">
+                      Focused on {personNameForId(relationshipScopePersonId)}
+                    </Badge>
+                  ) : null}
+                  {editingRelationshipId ? (
+                    <Badge className="bg-[color:rgba(227,182,97,0.16)] text-[#8D642A]">
+                      Editing an existing relationship
+                    </Badge>
+                  ) : (
+                    <Badge className="bg-[color:rgba(42,74,47,0.08)] text-[var(--brand-forest)]">
+                      Add a new connection
+                    </Badge>
+                  )}
+                  {relationshipScopePersonId &&
+                  relationshipDraft.fromPersonId !== relationshipScopePersonId ? (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      className="px-3 py-2 text-xs"
+                      onClick={() =>
+                        setRelationshipDraft((current) => ({
+                          ...current,
+                          fromPersonId: relationshipScopePersonId,
+                        }))
+                      }
+                      disabled={!canCreatePeople}
+                    >
+                      Use selected person as source
+                    </Button>
+                  ) : null}
                 </div>
                 <form className="space-y-3" onSubmit={handleCreateRelationship}>
                   <select
@@ -923,10 +1222,123 @@ export function TreeWorkspace({
                     disabled={!canCreatePeople}
                     placeholder="Optional note about this relationship"
                   />
-                  <Button type="submit" className="w-full" disabled={!canCreatePeople}>
-                    Save relationship
-                  </Button>
+                  <div className="flex flex-wrap gap-3">
+                    <Button type="submit" className="flex-1" disabled={!canCreatePeople}>
+                      {editingRelationshipId ? "Update relationship" : "Save relationship"}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={startNewRelationship}
+                      disabled={!canCreatePeople}
+                    >
+                      {editingRelationshipId ? "Cancel edit" : "New relationship"}
+                    </Button>
+                  </div>
                 </form>
+
+                <div className="space-y-3 border-t border-[color:var(--border-soft)] pt-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <h4 className="text-sm font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">
+                        Active connections
+                      </h4>
+                      <p className="mt-1 text-sm text-[var(--ink-soft)]">
+                        {relationshipScopePersonId
+                          ? "Showing only the selected person's relationships."
+                          : "Showing every active relationship in the tree."}
+                      </p>
+                    </div>
+                    <Badge className="bg-[color:rgba(227,182,97,0.16)] text-[#8D642A]">
+                      {visibleRelationships.length}
+                    </Badge>
+                  </div>
+
+                  <div className="max-h-[360px] space-y-3 overflow-y-auto pr-1">
+                    {visibleRelationships.length === 0 ? (
+                      <div className="rounded-lg border border-dashed border-[color:var(--border-soft)] bg-white/60 p-4 text-sm text-[var(--ink-soft)]">
+                        No relationships match this view yet. Create one above to connect relatives.
+                      </div>
+                    ) : (
+                      visibleRelationships.map((relationship) => (
+                        <div
+                          key={relationship.id}
+                          className={`rounded-lg border p-4 transition ${
+                            editingRelationshipId === relationship.id
+                              ? "border-[color:var(--brand-amber)] bg-[color:rgba(255,247,231,0.9)]"
+                              : "border-[color:var(--border-soft)] bg-white/72"
+                          }`}
+                        >
+                          <div className="flex flex-col gap-3">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <Badge className="bg-[color:rgba(42,74,47,0.08)] text-[var(--brand-forest)]">
+                                {relationshipTypeLabel(relationship.type)}
+                              </Badge>
+                              <p className="text-sm font-semibold text-[var(--ink-strong)]">
+                                {personNameForId(relationship.fromPersonId)}{" "}
+                                <span className="text-[var(--ink-muted)]">to</span>{" "}
+                                {personNameForId(relationship.toPersonId)}
+                              </p>
+                            </div>
+
+                            {relationship.note ? (
+                              <p className="text-sm leading-7 text-[var(--ink-soft)]">
+                                {relationship.note}
+                              </p>
+                            ) : (
+                              <p className="text-sm text-[var(--ink-muted)]">
+                                No note added for this relationship yet.
+                              </p>
+                            )}
+
+                            <div className="flex flex-wrap gap-2">
+                              {canManageExistingRelationships ? (
+                                <>
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    className="gap-2"
+                                    onClick={() => handleEditRelationship(relationship)}
+                                  >
+                                    <PencilLine className="size-4" />
+                                    Edit
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    className="gap-2 text-[#9A4136] hover:bg-[rgba(154,65,54,0.08)] hover:text-[#9A4136]"
+                                    onClick={() => handleDeleteRelationship(relationship.id)}
+                                  >
+                                    <Trash2 className="size-4" />
+                                    Remove
+                                  </Button>
+                                </>
+                              ) : (
+                                <div className="rounded-full bg-[color:rgba(42,74,47,0.06)] px-3 py-2 text-xs font-medium text-[var(--ink-muted)]">
+                                  {bundle.access.role === "CONTRIBUTOR"
+                                    ? "Owners approve structural changes in this tree."
+                                    : "Read-only access"}
+                                </div>
+                              )}
+
+                              {editingRelationshipId === relationship.id ? (
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  className="gap-2"
+                                  onClick={startNewRelationship}
+                                >
+                                  <X className="size-4" />
+                                  Stop editing
+                                </Button>
+                              ) : null}
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
               </Card>
 
               {bundle.links ? (
@@ -934,46 +1346,56 @@ export function TreeWorkspace({
               ) : (
                 <Card className="space-y-4">
                   <div className="flex items-center gap-3">
-                    <div className="flex size-10 items-center justify-center rounded-2xl bg-[color:rgba(227,182,97,0.18)] text-[var(--brand-forest)]">
+                    <div className="flex size-10 items-center justify-center rounded-lg bg-[color:rgba(227,182,97,0.18)] text-[var(--brand-forest)]">
                       <Share2 className="size-5" />
                     </div>
                     <div>
-                      <h3 className="text-lg font-semibold text-[var(--ink-strong)]">
-                        Family member list
-                      </h3>
+                      <h3 className="text-lg font-semibold text-[var(--ink-strong)]">People</h3>
                       <p className="text-sm text-[var(--ink-muted)]">
-                        Select someone from the filtered results to open their profile.
+                        {filteredPeople.length} visible in the current search results.
                       </p>
                     </div>
                   </div>
                   <div className="max-h-[360px] space-y-2 overflow-y-auto pr-1">
-                    {filteredPeople.map((person) => (
-                      <button
-                        key={person.id}
-                        type="button"
-                        onClick={() => {
-                          setStarterPreset(null);
-                          setSelectedPersonId(person.id);
-                        }}
-                        className={`w-full rounded-2xl border px-4 py-3 text-left transition ${
-                          selectedPersonId === person.id
-                            ? "border-[color:var(--brand-amber)] bg-[color:rgba(255,248,234,0.88)]"
-                            : "border-[color:var(--border-soft)] bg-white/70 hover:bg-white"
-                        }`}
-                      >
-                        <div className="flex items-center justify-between gap-3">
-                          <div>
-                            <p className="font-semibold text-[var(--ink-strong)]">
-                              {formatPersonName(person)}
-                            </p>
-                            <p className="text-sm text-[var(--ink-muted)]">
-                              {person.currentCity || person.occupation || "No extra details yet"}
-                            </p>
+                    {filteredPeople.length === 0 ? (
+                      <div className="rounded-lg border border-dashed border-[color:var(--border-soft)] bg-white/60 p-4 text-sm text-[var(--ink-soft)]">
+                        No people match the current search and filters. Clear the filters to see the full tree again.
+                      </div>
+                    ) : (
+                      filteredPeople.map((person) => (
+                        <button
+                          key={person.id}
+                          type="button"
+                          onClick={() => {
+                            setSelectedPersonId(person.id);
+                          }}
+                          className={`w-full rounded-lg border px-4 py-3 text-left transition ${
+                            selectedPersonId === person.id
+                              ? "border-[color:var(--brand-amber)] bg-[color:rgba(255,248,234,0.88)]"
+                              : "border-[color:var(--border-soft)] bg-white/70 hover:bg-white"
+                          }`}
+                        >
+                          <div className="flex items-center justify-between gap-3">
+                            <div>
+                              <p className="font-semibold text-[var(--ink-strong)]">
+                                {formatPersonName(person)}
+                              </p>
+                              <p className="text-sm text-[var(--ink-muted)]">
+                                {person.currentCity || person.occupation || "No extra details yet"}
+                              </p>
+                            </div>
+                            <div className="flex flex-wrap justify-end gap-2">
+                              {person.claimedBy ? <Badge>Claimed</Badge> : null}
+                              {person.branchKey ? (
+                                <Badge className="bg-[color:rgba(42,74,47,0.08)] text-[var(--brand-forest)]">
+                                  {formatBranchLabel(person.branchKey)}
+                                </Badge>
+                              ) : null}
+                            </div>
                           </div>
-                          {person.claimedBy ? <Badge>Claimed</Badge> : null}
-                        </div>
-                      </button>
-                    ))}
+                        </button>
+                      ))
+                    )}
                   </div>
                 </Card>
               )}
@@ -994,7 +1416,7 @@ export function TreeWorkspace({
                     bundle.moderationQueue.map((item) => (
                       <div
                         key={item.id}
-                        className="rounded-3xl border border-[color:var(--border-soft)] bg-white/70 p-4"
+                        className="rounded-lg border border-[color:var(--border-soft)] bg-white/70 p-4"
                       >
                         <p className="font-semibold text-[var(--ink-strong)]">
                           {item.type.toLowerCase()} relationship
@@ -1040,14 +1462,14 @@ export function TreeWorkspace({
                 <div>
                   <h3 className="text-lg font-semibold text-[var(--ink-strong)]">Recent edits</h3>
                   <p className="text-sm text-[var(--ink-muted)]">
-                    Owner links can roll supported changes back from the activity log.
+                    Owners can roll supported changes back from the activity log.
                   </p>
                 </div>
                 <div className="space-y-3">
                   {bundle.history.map((entry) => (
                     <div
                       key={entry.id}
-                      className="rounded-3xl border border-[color:var(--border-soft)] bg-white/72 p-4"
+                      className="rounded-lg border border-[color:var(--border-soft)] bg-white/72 p-4"
                     >
                       <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                         <div>
@@ -1079,7 +1501,6 @@ export function TreeWorkspace({
 
           <PersonEditorPanel
             person={selectedPerson}
-            starterPreset={starterPreset}
             canEdit={Boolean(canEditSelected)}
             canDelete={Boolean(canDeleteSelected)}
             canClaim={Boolean(canClaimSelected)}
@@ -1092,6 +1513,31 @@ export function TreeWorkspace({
           />
         </div>
       </div>
+
+      {nameGateOpen && bundle?.myEditor?.needsNamePrompt ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 px-4 py-8">
+          <Card className="w-full max-w-md space-y-4 p-6 shadow-lg">
+            <div>
+              <h2 className="text-lg font-semibold text-[var(--ink-strong)]">Who is editing?</h2>
+              <p className="mt-2 text-sm leading-7 text-[var(--ink-muted)]">
+                The tree owner will see this name next to your edits in the activity log.
+              </p>
+            </div>
+            <form className="space-y-3" onSubmit={handleNameGateSubmit}>
+              <Input
+                value={nameGateDraft}
+                onChange={(event) => setNameGateDraft(event.target.value)}
+                placeholder="e.g. Jamie (aunt)"
+                autoFocus
+                required
+              />
+              <Button type="submit" className="w-full" disabled={Boolean(busyMessage)}>
+                {busyMessage ?? "Continue"}
+              </Button>
+            </form>
+          </Card>
+        </div>
+      ) : null}
     </div>
   );
 }

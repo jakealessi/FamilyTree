@@ -1,6 +1,7 @@
 const ACCESS_KEY_PREFIX = "familytree:access";
 const EDITOR_KEY_PREFIX = "familytree:editor";
 const EDITOR_NAME_KEY_PREFIX = "familytree:editor-name";
+const DEVICE_KEY = "familytree:device-id";
 
 type StoredSession = {
   token: string | null;
@@ -91,13 +92,16 @@ export function clearStoredSession(slug: string) {
   readStorage()?.removeItem(accessKey(slug));
 }
 
-export function getOrCreateEditorToken(slug: string) {
+/**
+ * Stable ID for this browser, used when creating a new tree so the same device is recognized as owner.
+ */
+export function getOrCreateDeviceToken() {
   const storage = readStorage();
   if (!storage) {
     return null;
   }
 
-  const existing = storage.getItem(editorKey(slug));
+  const existing = storage.getItem(DEVICE_KEY);
   if (existing) {
     return existing;
   }
@@ -107,8 +111,31 @@ export function getOrCreateEditorToken(slug: string) {
       ? crypto.randomUUID()
       : `${Date.now()}-${Math.random()}`;
 
-  storage.setItem(editorKey(slug), next);
+  storage.setItem(DEVICE_KEY, next);
   return next;
+}
+
+/**
+ * Per-tree editor token for API calls. Uses a legacy per-slug value when present so existing owner bindings keep working.
+ */
+export function getOrCreateEditorToken(slug: string) {
+  const storage = readStorage();
+  if (!storage) {
+    return null;
+  }
+
+  const legacy = storage.getItem(editorKey(slug));
+  if (legacy) {
+    return legacy;
+  }
+
+  const device = getOrCreateDeviceToken();
+  if (!device) {
+    return null;
+  }
+
+  storage.setItem(editorKey(slug), device);
+  return device;
 }
 
 export function getStoredEditorName(slug: string) {

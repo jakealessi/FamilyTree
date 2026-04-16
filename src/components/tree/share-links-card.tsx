@@ -1,34 +1,39 @@
 "use client";
 
-import { Link2, Shield, Users, Eye } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Check, Link2, Users, Eye } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { copyTextToClipboard } from "@/lib/client/clipboard";
 
 type ShareLinks = {
-  owner: string;
-  contributor: string;
+  stable: string;
+  edit: string;
   viewer: string | null;
 };
 
 export function ShareLinksCard({ links }: { links: ShareLinks }) {
+  const [copiedLabel, setCopiedLabel] = useState<string | null>(null);
+  const [copyError, setCopyError] = useState<string | null>(null);
+  const resetCopyTimeoutRef = useRef<number | null>(null);
   const items = [
     {
-      label: "Owner",
-      description: "Full control, moderation, rollback, and reactivation.",
-      value: links.owner,
-      icon: Shield,
+      label: "Tree address",
+      description: "Bookmark this page on your device. On the device that created the tree, you are the owner automatically.",
+      value: links.stable,
+      icon: Link2,
     },
     {
-      label: "Contributor",
-      description: "Family members can add people, claim profiles, and suggest structure.",
-      value: links.contributor,
+      label: "Invite editors",
+      description: "Anyone with this link can help add people and relationships. They will be asked for their name for the activity log.",
+      value: links.edit,
       icon: Users,
     },
     links.viewer
       ? {
-          label: "Viewer",
-          description: "Read-only access for relatives who just want to browse.",
+          label: "View only",
+          description: "Read-only browsing for relatives who should not change the tree.",
           value: links.viewer,
           icon: Eye,
         }
@@ -37,21 +42,44 @@ export function ShareLinksCard({ links }: { links: ShareLinks }) {
     label: string;
     description: string;
     value: string;
-    icon: typeof Shield;
+    icon: typeof Link2;
   }>;
 
+  useEffect(() => {
+    return () => {
+      if (resetCopyTimeoutRef.current) {
+        window.clearTimeout(resetCopyTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  async function handleCopy(label: string, value: string) {
+    const didCopy = await copyTextToClipboard(value);
+    if (didCopy) {
+      setCopiedLabel(label);
+      setCopyError(null);
+      if (resetCopyTimeoutRef.current) {
+        window.clearTimeout(resetCopyTimeoutRef.current);
+      }
+      resetCopyTimeoutRef.current = window.setTimeout(() => {
+        setCopiedLabel((current) => (current === label ? null : current));
+      }, 1500);
+      return;
+    }
+
+    setCopyError("Copying was blocked on this device. You can still select a link and copy it manually.");
+  }
+
   return (
-    <Card className="space-y-4">
-      <div className="flex items-center gap-3">
-        <div className="flex size-10 items-center justify-center rounded-2xl bg-[color:rgba(227,182,97,0.18)] text-[var(--brand-forest)]">
-          <Link2 className="size-5" />
-        </div>
-        <div>
-          <h3 className="text-lg font-semibold text-[var(--ink-strong)]">Share links</h3>
-          <p className="text-sm text-[var(--ink-muted)]">
-            Copy and send only the access level each relative needs.
-          </p>
-        </div>
+    <Card className="space-y-5">
+      {copiedLabel ? (
+        <p className="sr-only" aria-live="polite">
+          {copiedLabel} copied to clipboard
+        </p>
+      ) : null}
+      <div>
+        <h3 className="text-base font-semibold text-[var(--ink-strong)]">Sharing</h3>
+        <p className="mt-1 text-sm text-[var(--ink-muted)]">Copy links to invite or bookmark.</p>
       </div>
 
       <div className="space-y-3">
@@ -60,30 +88,49 @@ export function ShareLinksCard({ links }: { links: ShareLinks }) {
           return (
             <div
               key={item.label}
-              className="rounded-3xl border border-[color:var(--border-soft)] bg-white/70 p-4"
+              className={`rounded-lg border bg-white p-4 transition-colors ${
+                copiedLabel === item.label
+                  ? "border-[color:var(--brand-forest)] bg-[color:var(--state-info-bg)]"
+                  : "border-[color:var(--border-soft)]"
+              }`}
             >
               <div className="mb-2 flex items-center gap-2">
-                <Icon className="size-4 text-[var(--brand-forest)]" />
-                <p className="font-semibold text-[var(--ink-strong)]">{item.label}</p>
+                <Icon className="size-4 text-[var(--brand-forest)]" aria-hidden />
+                <p className="font-medium text-[var(--ink-strong)]">{item.label}</p>
               </div>
-              <p className="mb-3 text-sm text-[var(--ink-muted)]">{item.description}</p>
+              <p className="mb-3 text-xs text-[var(--ink-muted)]">{item.description}</p>
               <div className="flex gap-2">
                 <input
                   readOnly
                   value={item.value}
-                  className="w-full rounded-2xl border border-[color:var(--border-soft)] bg-[color:rgba(255,255,255,0.74)] px-3 py-2 text-xs text-[var(--ink-soft)]"
+                  aria-label={`${item.label} URL`}
+                  className="w-full rounded-lg border border-[color:var(--border-soft)] bg-[color:rgba(0,0,0,0.02)] px-3 py-2 text-xs text-[var(--ink-soft)]"
                 />
                 <Button
                   variant="outline"
-                  onClick={() => navigator.clipboard.writeText(item.value)}
+                  onClick={() => void handleCopy(item.label, item.value)}
+                  className={
+                    copiedLabel === item.label
+                      ? "border-[color:var(--brand-forest)] text-[var(--brand-forest)]"
+                      : undefined
+                  }
                 >
-                  Copy
+                  {copiedLabel === item.label ? (
+                    <span className="inline-flex items-center gap-1.5">
+                      <Check className="size-4" />
+                      Copied
+                    </span>
+                  ) : (
+                    "Copy"
+                  )}
                 </Button>
               </div>
             </div>
           );
         })}
       </div>
+
+      {copyError ? <p className="text-xs leading-6 text-[var(--ink-soft)]">{copyError}</p> : null}
     </Card>
   );
 }

@@ -1,5 +1,3 @@
-export type WorkspaceViewMode = "artistic" | "classic";
-
 export type TreeBundle = {
   tree: {
     id: string;
@@ -9,23 +7,23 @@ export type TreeBundle = {
     description: string | null;
     moderationMode: "OPEN" | "REVIEW_STRUCTURE";
     status: "ACTIVE" | "ARCHIVED";
-    archivedAt: string | null;
     lastActivityAt: string;
   };
   access: {
     role: "OWNER" | "CONTRIBUTOR" | "VIEWER" | "PERSONAL" | null;
     isArchived: boolean;
     claimedPersonId: string | null;
-    editorIdentity: {
-      id: string;
-      displayName: string | null;
-      accentColor: string | null;
-      claimedPersonId: string | null;
-    } | null;
+  };
+  myEditor?: {
+    displayName: string | null;
+    needsNamePrompt: boolean;
+  };
+  account?: {
+    linkedToUser: boolean;
   };
   links?: {
-    owner: string;
-    contributor: string;
+    stable: string;
+    edit: string;
     viewer: string | null;
   };
   people: Array<{
@@ -56,7 +54,6 @@ export type TreeBundle = {
     layoutX: number | null;
     layoutY: number | null;
     isPrivate: boolean;
-    deletedAt: string | null;
     claimedBy: {
       id: string;
       displayName: string | null;
@@ -66,9 +63,6 @@ export type TreeBundle = {
       type: string;
       url: string;
       caption: string | null;
-      fileName: string | null;
-      mimeType: string | null;
-      sizeBytes: number | null;
     }>;
   }>;
   relationships: Array<{
@@ -78,13 +72,11 @@ export type TreeBundle = {
     type: string;
     status: string;
     note: string | null;
-    deletedAt: string | null;
     proposedByEditorId: string | null;
   }>;
   history: Array<{
     id: string;
     entityType: string;
-    entityId: string;
     action: string;
     summary: string;
     createdAt: string;
@@ -100,6 +92,5 @@ export type TreeBundle = {
     toPersonId: string;
     type: string;
     note: string | null;
-    createdAt: string;
   }>;
 };

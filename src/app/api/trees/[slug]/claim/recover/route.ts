@@ -5,6 +5,7 @@ import { resolveTreeAccess } from "@/lib/server/access";
 import { prisma } from "@/lib/server/db";
 import { jsonError, parseJson } from "@/lib/server/request";
 import {
+  accentColorFromToken,
   buildPersonalLink,
   generateOpaqueToken,
   hashToken,
@@ -14,11 +15,6 @@ import {
 type RouteContext = {
   params: Promise<{ slug: string }>;
 };
-
-function accentColorFromToken(token: string) {
-  const digest = hashToken(token);
-  return `#${digest.slice(0, 6)}`;
-}
 
 export async function POST(request: Request, context: RouteContext) {
   const { slug } = await context.params;
@@ -35,7 +31,7 @@ export async function POST(request: Request, context: RouteContext) {
 
   if (access.isArchived) {
     return jsonError(
-      "Archived trees must be reactivated with the owner link before personal recovery can continue.",
+      "Archived trees must be reactivated by the owner before personal recovery can continue.",
       409,
     );
   }
@@ -128,7 +124,6 @@ export async function POST(request: Request, context: RouteContext) {
 
   const origin = new URL(request.url).origin;
   return NextResponse.json({
-    personId: recovery.personId,
     personalLink: buildPersonalLink(origin, access.tree.slug, personalToken),
   });
 }

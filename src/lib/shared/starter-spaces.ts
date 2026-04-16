@@ -4,54 +4,48 @@ export type StarterSpacePreset = {
   subtitle: string;
   generation: number;
   branchKey: string;
-  classicPositionClassName: string;
-  artisticPositionClassName: string;
+  positionClassName: string;
 };
 
 export const STARTER_SPACE_PRESETS: StarterSpacePreset[] = [
   {
     id: "grandparent-left",
     title: "Grandparent branch",
-    subtitle: "An older branch near the roots",
+    subtitle: "Start with an older generation",
     generation: 0,
     branchKey: "roots",
-    classicPositionClassName: "left-[14%] top-[14%]",
-    artisticPositionClassName: "left-[14%] top-[56%]",
+    positionClassName: "left-[12%] top-[16%]",
   },
   {
     id: "grandparent-right",
     title: "Grandparent branch",
-    subtitle: "Another elder branch to begin the story",
+    subtitle: "Add another elder branch beside it",
     generation: 0,
     branchKey: "roots",
-    classicPositionClassName: "right-[14%] top-[14%]",
-    artisticPositionClassName: "right-[14%] top-[56%]",
+    positionClassName: "right-[12%] top-[16%]",
   },
   {
     id: "parent-left",
     title: "Parent or guardian",
-    subtitle: "Build the middle branch of the family",
+    subtitle: "Build the middle generation",
     generation: 1,
     branchKey: "trunk",
-    classicPositionClassName: "left-[24%] top-[40%]",
-    artisticPositionClassName: "left-[24%] top-[34%]",
+    positionClassName: "left-[22%] top-[42%]",
   },
   {
     id: "parent-right",
     title: "Parent or guardian",
-    subtitle: "Add another branch beside it",
+    subtitle: "Add a second person on this row",
     generation: 1,
     branchKey: "trunk",
-    classicPositionClassName: "right-[24%] top-[40%]",
-    artisticPositionClassName: "right-[24%] top-[34%]",
+    positionClassName: "right-[22%] top-[42%]",
   },
   {
     id: "self",
     title: "Start with you",
-    subtitle: "Plant the first leaf in the canopy",
+    subtitle: "Anchor the newest generation here",
     generation: 2,
     branchKey: "blossom",
-    classicPositionClassName: "left-1/2 top-[70%] -translate-x-1/2",
-    artisticPositionClassName: "left-1/2 top-[14%] -translate-x-1/2",
+    positionClassName: "left-1/2 top-[69%] -translate-x-1/2",
   },
 ];

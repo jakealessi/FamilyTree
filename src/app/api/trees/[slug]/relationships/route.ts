@@ -3,14 +3,13 @@ import { NextResponse } from "next/server";
 
 import { relationshipPayloadSchema } from "@/lib/shared/schemas";
 import { formatPersonName } from "@/lib/shared/utils";
-import { resolveTreeAccess } from "@/lib/server/access";
 import { prisma } from "@/lib/server/db";
 import { recordHistory } from "@/lib/server/history";
 import {
   canEditRelationships,
   needsStructuralModeration,
 } from "@/lib/server/permissions";
-import { jsonError, parseJson, readRequestTokens } from "@/lib/server/request";
+import { jsonError, parseJson, resolveTreeAccessFromRequest } from "@/lib/server/request";
 import {
   relationshipStatusForSubmission,
   relationshipSummary,
@@ -64,13 +63,7 @@ export async function POST(request: Request, context: RouteContext) {
     return jsonError("Invalid relationship payload.", 422, parsed.error.flatten());
   }
 
-  const tokens = readRequestTokens(request);
-  const access = await resolveTreeAccess({
-    slug,
-    token: tokens.token,
-    personalToken: tokens.personalToken,
-    browserToken: tokens.browserToken,
-  });
+  const access = await resolveTreeAccessFromRequest(request, slug);
 
   if (!access || !canEditRelationships(access.role)) {
     return jsonError("This link cannot edit relationships.", 403);

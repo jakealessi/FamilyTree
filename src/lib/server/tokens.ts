@@ -35,6 +35,10 @@ export function hashToken(value: string) {
   return createHash("sha256").update(value).digest("hex");
 }
 
+export function accentColorFromToken(token: string) {
+  return `#${hashToken(token).slice(0, 6)}`;
+}
+
 export function generateRecoveryCode() {
   return Array.from({ length: 4 }, () =>
     randomBytes(2).toString("hex").toUpperCase(),

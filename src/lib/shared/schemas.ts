@@ -12,6 +12,18 @@ export const createTreeSchema = z.object({
     .enum(["OPEN", "REVIEW_STRUCTURE"])
     .optional()
     .default("REVIEW_STRUCTURE"),
+  ownerBrowserToken: z.string().trim().min(16).optional(),
+});
+
+export const registerSchema = z.object({
+  email: z.string().trim().email().max(120),
+  password: z.string().min(8).max(200),
+  displayName: z.string().trim().max(80).optional().nullable(),
+});
+
+export const loginSchema = z.object({
+  email: z.string().trim().email().max(120),
+  password: z.string().min(1).max(200),
 });
 
 export const resolveIdentitySchema = z.object({

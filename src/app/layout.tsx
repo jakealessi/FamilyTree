@@ -4,7 +4,7 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "Branchbook",
   description:
-    "A collaborative family tree app with no accounts, secure share links, artistic tree views, and classic family diagrams.",
+    "A collaborative family tree app with no accounts, secure share links, and a clean readable family diagram.",
 };
 
 export default function RootLayout({

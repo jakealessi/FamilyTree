@@ -1,21 +1,40 @@
 @import "tailwindcss";
 
 :root {
-  --background: #efe7db;
+  --background: #f4f1eb;
   --foreground: #2c241d;
-  --page-wash: #f5efe6;
+  --page-wash: #f4f1eb;
+  --surface: rgba(255, 255, 255, 0.95);
+  --surface-strong: #ffffff;
   --brand-forest: #2a4a2f;
   --brand-amber: #e3b661;
   --ink-strong: #2f241c;
   --ink-soft: #655847;
   --ink-muted: #8c7c68;
-  --border-soft: rgba(88, 67, 44, 0.13);
+  --border-soft: rgba(88, 67, 44, 0.16);
+  --state-warning-bg: rgba(255, 248, 234, 0.95);
+  --state-warning-border: rgba(227, 182, 97, 0.55);
+  --state-warning-text: #6b5420;
+  --state-info-bg: rgba(42, 74, 47, 0.06);
+  --state-danger-bg: rgba(154, 65, 54, 0.08);
+  --state-danger-text: #7a3329;
+  --focus-ring: rgba(42, 74, 47, 0.35);
+}
+
+@keyframes ui-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.ui-spinner {
+  animation: ui-spin 0.75s linear infinite;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: "Avenir Next", "Segoe UI", sans-serif;
+  --font-sans: "Avenir Next", "Segoe UI", system-ui, sans-serif;
   --font-mono: "SFMono-Regular", "SF Mono", Monaco, monospace;
 }
 
@@ -25,71 +44,26 @@
 
 html {
   background: var(--page-wash);
+  scroll-behavior: smooth;
 }
 
 body {
   min-height: 100vh;
-  background:
-    radial-gradient(circle at top, rgba(248, 235, 207, 0.55), transparent 30%),
-    linear-gradient(180deg, #f7f1e7 0%, #efe7db 28%, #ece2d4 100%);
+  background: var(--page-wash);
   color: var(--foreground);
-  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  font-family: var(--font-sans);
 }
 
 h1,
 h2,
 h3,
 h4 {
-  font-family: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", serif;
+  font-family: var(--font-sans);
+  font-weight: 600;
 }
 
 a {
   color: inherit;
-}
-
-.hero-tree {
-  background:
-    radial-gradient(circle at 25% 18%, rgba(132, 164, 96, 0.16), transparent 22%),
-    radial-gradient(circle at 74% 24%, rgba(171, 115, 111, 0.15), transparent 20%),
-    radial-gradient(circle at 46% 8%, rgba(236, 197, 112, 0.18), transparent 18%),
-    linear-gradient(180deg, transparent, rgba(118, 84, 51, 0.05));
-}
-
-.family-flow .react-flow__attribution {
-  display: none;
-}
-
-.family-flow .react-flow__controls-button {
-  background: rgba(255, 255, 255, 0.9);
-  border-bottom-color: var(--border-soft);
-}
-
-.family-flow .react-flow__edge-text {
-  font-size: 10px;
-  fill: var(--ink-muted);
-}
-
-.family-flow--artistic .react-flow__node {
-  background: transparent;
-  border: 0;
-  box-shadow: none;
-}
-
-.family-flow--artistic .react-flow__node:focus,
-.family-flow--artistic .react-flow__node:focus-visible {
-  outline: none;
-}
-
-.family-flow--artistic .react-flow__node-silhouette {
-  pointer-events: none;
-}
-
-.family-flow--artistic .react-flow__edge-path {
-  filter: drop-shadow(0 8px 16px rgba(89, 63, 44, 0.12));
-}
-
-.family-flow--artistic .react-flow__panel {
-  backdrop-filter: blur(10px);
 }
 
 img {

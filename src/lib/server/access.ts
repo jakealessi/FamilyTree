@@ -6,7 +6,7 @@ import { ARCHIVE_AFTER_MONTHS } from "@/lib/shared/constants";
 import { prisma } from "./db";
 import { hashToken } from "./tokens";
 
-export type AccessContext = {
+type AccessContext = {
   tree: FamilyTree;
   role: AccessRole | null;
   editorIdentity: EditorIdentity | null;
@@ -14,6 +14,8 @@ export type AccessContext = {
   isArchived: boolean;
   token: string | null;
   personalToken: string | null;
+  isOwnerByBrowser: boolean;
+  isOwnerByAccount: boolean;
 };
 
 export function isTreeArchived(tree: Pick<FamilyTree, "status" | "lastActivityAt">) {
@@ -28,6 +30,7 @@ export async function resolveTreeAccess(args: {
   token?: string | null;
   personalToken?: string | null;
   browserToken?: string | null;
+  userId?: string | null;
 }) {
   const tree = await prisma.familyTree.findUnique({
     where: { slug: args.slug },
@@ -39,6 +42,13 @@ export async function resolveTreeAccess(args: {
 
   let role: AccessRole | null = null;
   let claimedPersonId: string | null = null;
+
+  const isOwnerByAccount = Boolean(args.userId && tree.ownerUserId === args.userId);
+  const isOwnerByBrowser = Boolean(
+    args.browserToken &&
+      tree.ownerBrowserTokenHash &&
+      hashToken(args.browserToken) === tree.ownerBrowserTokenHash,
+  );
 
   if (args.personalToken) {
     const recovery = await prisma.claimRecovery.findFirst({
@@ -67,6 +77,10 @@ export async function resolveTreeAccess(args: {
     }
   }
 
+  if (!role && (isOwnerByAccount || isOwnerByBrowser)) {
+    role = AccessRole.OWNER;
+  }
+
   let editorIdentity: EditorIdentity | null = null;
   if (args.browserToken) {
     editorIdentity = await prisma.editorIdentity.findUnique({
@@ -91,5 +105,7 @@ export async function resolveTreeAccess(args: {
     isArchived: isTreeArchived(tree),
     token: args.token ?? null,
     personalToken: args.personalToken ?? null,
+    isOwnerByBrowser,
+    isOwnerByAccount,
   } satisfies AccessContext;
 }

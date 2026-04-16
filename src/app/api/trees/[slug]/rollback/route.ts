@@ -2,11 +2,10 @@ import { EditAction, EditEntityType, Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 
 import { rollbackSchema } from "@/lib/shared/schemas";
-import { resolveTreeAccess } from "@/lib/server/access";
 import { prisma } from "@/lib/server/db";
 import { recordHistory } from "@/lib/server/history";
 import { canRollback } from "@/lib/server/permissions";
-import { jsonError, parseJson, readRequestTokens } from "@/lib/server/request";
+import { jsonError, parseJson, resolveTreeAccessFromRequest } from "@/lib/server/request";
 import { personDataFromInput } from "@/lib/server/tree-service";
 
 type RouteContext = {
@@ -81,15 +80,10 @@ export async function POST(request: Request, context: RouteContext) {
     return jsonError("Invalid rollback payload.", 422, parsed.error.flatten());
   }
 
-  const tokens = readRequestTokens(request);
-  const access = await resolveTreeAccess({
-    slug,
-    token: tokens.token,
-    personalToken: tokens.personalToken,
-  });
+  const access = await resolveTreeAccessFromRequest(request, slug);
 
   if (!access || !canRollback(access.role)) {
-    return jsonError("Only owner links can roll changes back.", 403);
+    return jsonError("Only the tree owner can roll changes back.", 403);
   }
 
   if (access.isArchived) {

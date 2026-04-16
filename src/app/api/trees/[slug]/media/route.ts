@@ -2,11 +2,10 @@ import { EditAction, EditEntityType, MediaType } from "@prisma/client";
 import { NextResponse } from "next/server";
 
 import { DEFAULT_MAX_UPLOAD_BYTES } from "@/lib/shared/constants";
-import { resolveTreeAccess } from "@/lib/server/access";
 import { prisma } from "@/lib/server/db";
 import { recordHistory } from "@/lib/server/history";
 import { canEditPerson } from "@/lib/server/permissions";
-import { jsonError, readRequestTokens } from "@/lib/server/request";
+import { jsonError, resolveTreeAccessFromRequest } from "@/lib/server/request";
 
 type RouteContext = {
   params: Promise<{ slug: string }>;
@@ -23,13 +22,7 @@ function isAllowedExternalImageUrl(value: string) {
 
 export async function POST(request: Request, context: RouteContext) {
   const { slug } = await context.params;
-  const tokens = readRequestTokens(request);
-  const access = await resolveTreeAccess({
-    slug,
-    token: tokens.token,
-    personalToken: tokens.personalToken,
-    browserToken: tokens.browserToken,
-  });
+  const access = await resolveTreeAccessFromRequest(request, slug);
 
   if (!access) {
     return jsonError("Tree not found.", 404);

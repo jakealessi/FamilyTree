@@ -16,7 +16,7 @@ The product model is link-based instead of account-based:
 - Profile claim flow with personal recovery codes and personal edit links
 - Rich person profiles with photos, life events, notes, occupations, quotes, and more
 - Parent, child, spouse, sibling, adopted, step, and foster relationships
-- Artistic tree view plus classic readable diagram mode
+- Clear, readable family diagram with guided starter spaces for brand-new trees
 - Moderation queue for structural edits
 - Edit history with rollback for supported changes
 - Archive-after-24-months behavior with owner/admin reactivation

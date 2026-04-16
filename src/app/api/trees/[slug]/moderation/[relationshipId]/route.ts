@@ -2,11 +2,10 @@ import { EditAction, EditEntityType } from "@prisma/client";
 import { NextResponse } from "next/server";
 
 import { moderationDecisionSchema } from "@/lib/shared/schemas";
-import { resolveTreeAccess } from "@/lib/server/access";
 import { prisma } from "@/lib/server/db";
 import { recordHistory } from "@/lib/server/history";
 import { canModerate } from "@/lib/server/permissions";
-import { jsonError, parseJson, readRequestTokens } from "@/lib/server/request";
+import { jsonError, parseJson, resolveTreeAccessFromRequest } from "@/lib/server/request";
 
 type RouteContext = {
   params: Promise<{ slug: string; relationshipId: string }>;
@@ -20,16 +19,10 @@ export async function POST(request: Request, context: RouteContext) {
     return jsonError("Invalid moderation decision.", 422, parsed.error.flatten());
   }
 
-  const tokens = readRequestTokens(request);
-  const access = await resolveTreeAccess({
-    slug,
-    token: tokens.token,
-    personalToken: tokens.personalToken,
-    browserToken: tokens.browserToken,
-  });
+  const access = await resolveTreeAccessFromRequest(request, slug);
 
   if (!access || !canModerate(access.role)) {
-    return jsonError("Only owner links can moderate structural edits.", 403);
+    return jsonError("Only the tree owner can moderate structural edits.", 403);
   }
 
   if (access.isArchived) {

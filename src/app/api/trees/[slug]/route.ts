@@ -1,9 +1,8 @@
 import { Prisma, RelationshipStatus } from "@prisma/client";
 import { NextResponse } from "next/server";
 
-import { canView } from "@/lib/server/permissions";
-import { jsonError, readRequestTokens } from "@/lib/server/request";
-import { resolveTreeAccess } from "@/lib/server/access";
+import { canEditTree, canView } from "@/lib/server/permissions";
+import { jsonError, readTreeAuth, resolveTreeAccessFromRequest } from "@/lib/server/request";
 import { prisma } from "@/lib/server/db";
 import { buildTreeLink } from "@/lib/server/tokens";
 import { toStringArray } from "@/lib/shared/utils";
@@ -19,13 +18,8 @@ function serializeJsonArray(value: Prisma.JsonValue | null | undefined) {
 
 export async function GET(request: Request, context: RouteContext) {
   const { slug } = await context.params;
-  const tokens = readRequestTokens(request);
-  const access = await resolveTreeAccess({
-    slug,
-    token: tokens.token,
-    personalToken: tokens.personalToken,
-    browserToken: tokens.browserToken,
-  });
+  const tokens = await readTreeAuth(request);
+  const access = await resolveTreeAccessFromRequest(request, slug);
 
   if (!access || !canView(access.role)) {
     return jsonError("This family tree is private. Use one of its secure links to open it.", 401);
@@ -105,6 +99,15 @@ export async function GET(request: Request, context: RouteContext) {
   const canSeeModerationQueue =
     access.role === "OWNER" || access.role === "CONTRIBUTOR";
 
+  const canEdit = canEditTree(access.role) || access.role === "PERSONAL";
+  const myEditor =
+    canEdit && tokens.browserToken
+      ? {
+          displayName: access.editorIdentity?.displayName ?? null,
+          needsNamePrompt: !access.editorIdentity?.displayName?.trim(),
+        }
+      : undefined;
+
   const response: TreeBundle = {
     tree: {
       id: tree.id,
@@ -114,27 +117,25 @@ export async function GET(request: Request, context: RouteContext) {
       description: tree.description,
       moderationMode: tree.moderationMode,
       status: tree.status,
-      archivedAt: tree.archivedAt?.toISOString() ?? null,
       lastActivityAt: tree.lastActivityAt.toISOString(),
     },
     access: {
       role: access.role,
       isArchived: access.isArchived,
       claimedPersonId: access.claimedPersonId,
-      editorIdentity: access.editorIdentity
-        ? {
-            id: access.editorIdentity.id,
-            displayName: access.editorIdentity.displayName,
-            accentColor: access.editorIdentity.accentColor,
-            claimedPersonId: access.editorIdentity.claimedPersonId,
-          }
-        : null,
     },
+    myEditor,
+    account:
+      access.role === "OWNER"
+        ? {
+            linkedToUser: Boolean(tree.ownerUserId),
+          }
+        : undefined,
     links:
       access.role === "OWNER"
         ? {
-            owner: buildTreeLink(origin, tree.slug, tree.ownerToken),
-            contributor: buildTreeLink(origin, tree.slug, tree.contributorToken),
+            stable: buildTreeLink(origin, tree.slug),
+            edit: buildTreeLink(origin, tree.slug, tree.contributorToken),
             viewer: tree.viewerToken ? buildTreeLink(origin, tree.slug, tree.viewerToken) : null,
           }
         : undefined,
@@ -166,16 +167,12 @@ export async function GET(request: Request, context: RouteContext) {
       layoutX: person.layoutX,
       layoutY: person.layoutY,
       isPrivate: person.isPrivate,
-      deletedAt: person.deletedAt?.toISOString() ?? null,
       claimedBy: person.claimedBy,
       media: person.media.map((media) => ({
         id: media.id,
         type: media.type,
         url: media.url,
         caption: media.caption,
-        fileName: media.fileName,
-        mimeType: media.mimeType,
-        sizeBytes: media.sizeBytes ?? null,
       })),
     })),
     relationships: activeRelationships.map((relationship) => ({
@@ -185,13 +182,11 @@ export async function GET(request: Request, context: RouteContext) {
       type: relationship.type,
       status: relationship.status,
       note: relationship.note,
-      deletedAt: relationship.deletedAt?.toISOString() ?? null,
       proposedByEditorId: relationship.proposedByEditorId,
     })),
     history: tree.editHistory.map((entry) => ({
       id: entry.id,
       entityType: entry.entityType,
-      entityId: entry.entityId,
       action: entry.action,
       summary: entry.summary,
       createdAt: entry.createdAt.toISOString(),
@@ -205,7 +200,6 @@ export async function GET(request: Request, context: RouteContext) {
           toPersonId: relationship.toPersonId,
           type: relationship.type,
           note: relationship.note,
-          createdAt: relationship.createdAt.toISOString(),
         }))
       : [],
   };

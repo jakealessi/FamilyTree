@@ -41,7 +41,7 @@ export function arrayToLines(values?: unknown) {
   return toStringArray(values).join("\n");
 }
 
-export function formatDateLabel(value?: string | Date | null) {
+function formatDateLabel(value?: string | Date | null) {
   if (!value) {
     return "Unknown";
   }
@@ -82,6 +82,14 @@ export function formatPersonName(person: {
     .join(" ");
 }
 
-export function clamp(value: number, min: number, max: number) {
-  return Math.min(max, Math.max(min, value));
+export function formatBranchLabel(branchKey?: string | null) {
+  if (!branchKey) {
+    return "Unassigned";
+  }
+
+  return branchKey
+    .split(/[-_\s]+/)
+    .filter(Boolean)
+    .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
+    .join(" ");
 }

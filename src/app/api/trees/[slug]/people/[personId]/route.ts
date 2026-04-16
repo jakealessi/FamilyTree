@@ -3,11 +3,10 @@ import { NextResponse } from "next/server";
 
 import { personPayloadSchema } from "@/lib/shared/schemas";
 import { formatPersonName, toStringArray } from "@/lib/shared/utils";
-import { resolveTreeAccess } from "@/lib/server/access";
 import { prisma } from "@/lib/server/db";
 import { recordHistory } from "@/lib/server/history";
 import { canDeletePerson, canEditPerson } from "@/lib/server/permissions";
-import { jsonError, parseJson, readRequestTokens } from "@/lib/server/request";
+import { jsonError, parseJson, resolveTreeAccessFromRequest } from "@/lib/server/request";
 import { personDataFromInput } from "@/lib/server/tree-service";
 
 type RouteContext = {
@@ -82,13 +81,7 @@ export async function PATCH(request: Request, context: RouteContext) {
     return jsonError("Invalid person update payload.", 422, parsed.error.flatten());
   }
 
-  const tokens = readRequestTokens(request);
-  const access = await resolveTreeAccess({
-    slug,
-    token: tokens.token,
-    personalToken: tokens.personalToken,
-    browserToken: tokens.browserToken,
-  });
+  const access = await resolveTreeAccessFromRequest(request, slug);
 
   if (!access) {
     return jsonError("Tree not found.", 404);
@@ -146,13 +139,7 @@ export async function PATCH(request: Request, context: RouteContext) {
 
 export async function DELETE(request: Request, context: RouteContext) {
   const { slug, personId } = await context.params;
-  const tokens = readRequestTokens(request);
-  const access = await resolveTreeAccess({
-    slug,
-    token: tokens.token,
-    personalToken: tokens.personalToken,
-    browserToken: tokens.browserToken,
-  });
+  const access = await resolveTreeAccessFromRequest(request, slug);
 
   if (!access || !canDeletePerson(access.role)) {
     return jsonError("This link cannot archive people.", 403);

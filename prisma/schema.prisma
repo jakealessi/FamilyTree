@@ -80,6 +80,28 @@ enum ModerationMode {
   REVIEW_STRUCTURE
 }
 
+model User {
+  id           String       @id @default(cuid())
+  email        String       @unique
+  passwordHash String       @db.Text
+  displayName  String?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  ownedTrees   FamilyTree[] @relation("TreeOwner")
+  sessions     Session[]
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  tokenHash String   @unique @db.Text
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
 model FamilyTree {
   id             String           @id @default(cuid())
   slug           String           @unique
@@ -89,6 +111,9 @@ model FamilyTree {
   ownerToken     String           @unique @db.Text
   contributorToken String         @unique @db.Text
   viewerToken    String?          @unique @db.Text
+  ownerBrowserTokenHash String?   @db.Text
+  ownerUserId    String?
+  owner          User?            @relation("TreeOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
   moderationMode ModerationMode   @default(REVIEW_STRUCTURE)
   status         TreeStatus       @default(ACTIVE)
   archivedAt     DateTime?
@@ -103,6 +128,8 @@ model FamilyTree {
   claimRecoveries ClaimRecovery[]
 
   @@index([lastActivityAt])
+  @@index([ownerUserId])
+  @@index([ownerBrowserTokenHash])
 }
 
 model EditorIdentity {

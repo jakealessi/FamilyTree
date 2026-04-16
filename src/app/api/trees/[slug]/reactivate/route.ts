@@ -1,10 +1,9 @@
 import { EditAction, EditEntityType } from "@prisma/client";
 import { NextResponse } from "next/server";
 
-import { resolveTreeAccess } from "@/lib/server/access";
 import { prisma } from "@/lib/server/db";
 import { recordHistory } from "@/lib/server/history";
-import { jsonError, readRequestTokens } from "@/lib/server/request";
+import { jsonError, resolveTreeAccessFromRequest } from "@/lib/server/request";
 
 type RouteContext = {
   params: Promise<{ slug: string }>;
@@ -12,7 +11,6 @@ type RouteContext = {
 
 export async function POST(request: Request, context: RouteContext) {
   const { slug } = await context.params;
-  const tokens = readRequestTokens(request);
   const body = ((await request.json().catch(() => ({}))) ?? {}) as {
     adminRecoveryToken?: string;
   };
@@ -20,12 +18,7 @@ export async function POST(request: Request, context: RouteContext) {
     Boolean(process.env.ADMIN_RECOVERY_TOKEN) &&
     body.adminRecoveryToken === process.env.ADMIN_RECOVERY_TOKEN;
 
-  const access = await resolveTreeAccess({
-    slug,
-    token: tokens.token,
-    personalToken: tokens.personalToken,
-    browserToken: tokens.browserToken,
-  });
+  const access = await resolveTreeAccessFromRequest(request, slug);
   const tree = access?.tree ?? (await prisma.familyTree.findUnique({ where: { slug } }));
 
   if (!tree) {
@@ -34,7 +27,7 @@ export async function POST(request: Request, context: RouteContext) {
 
   if ((!access || access.role !== "OWNER") && !adminRecoveryValid) {
     return jsonError(
-      "Only the owner link or a valid admin recovery token can reactivate this tree.",
+      "Only the tree owner or a valid admin recovery token can reactivate this tree.",
       403,
     );
   }
