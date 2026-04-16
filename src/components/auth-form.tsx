@@ -102,7 +102,7 @@ export function AuthForm() {
             </ul>
           </div>
         ) : (
-          <p className="text-sm text-[var(--ink-muted)]">No trees linked to this account yet.</p>
+          <p className="text-sm text-[var(--ink-muted)]">No trees</p>
         )}
         <Button type="button" variant="outline" onClick={() => void handleLogout()} disabled={busy}>
           Sign out
@@ -114,9 +114,6 @@ export function AuthForm() {
   return (
     <Card className="space-y-4 p-5">
       <p className="text-sm font-semibold text-[var(--ink-strong)]">Account</p>
-      <p className="text-sm text-[var(--ink-muted)]">
-        Sign in to save trees to your account and open them on other devices.
-      </p>
       <div className="flex gap-2">
         <Button
           type="button"
@@ -219,35 +216,24 @@ export function TreeAccountPanel({ slug, linkedToUser, onLinked }: TreeAccountPa
 
   if (linkedToUser) {
     return (
-      <p className="flex items-start gap-2 text-sm text-[var(--ink-muted)]">
-        <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-[var(--brand-forest)]" aria-hidden />
-        <span>
-          <span className="font-medium text-[var(--ink-strong)]">Saved to your account.</span> Open from
-          any device when signed in.
-        </span>
+      <p className="flex items-center gap-2 text-sm font-medium text-[var(--ink-strong)]">
+        <CheckCircle2 className="size-4 shrink-0 text-[var(--brand-forest)]" aria-hidden />
+        On your account
       </p>
     );
   }
 
   if (!me?.user) {
     return (
-      <div className="space-y-2">
-        <p className="text-sm text-[var(--ink-muted)]">
-          Create an account or sign in on the home page, then return here to link this tree.
-        </p>
-        <Link className="text-sm font-semibold text-[var(--brand-forest)]" href="/#account">
-          Go to account sign-in
-        </Link>
-      </div>
+      <Link className="text-sm font-semibold text-[var(--brand-forest)]" href="/#account">
+        Sign in to link
+      </Link>
     );
   }
 
   return (
     <div className="space-y-3">
-      <p className="text-sm text-[var(--ink-muted)]">
-        Link this tree to <span className="font-medium text-[var(--ink-strong)]">{me.user.email}</span> so
-        you can open it anywhere.
-      </p>
+      <p className="text-sm text-[var(--ink-strong)]">{me.user.email}</p>
       {error ? <p className="text-sm text-[#9A4136]">{error}</p> : null}
       <Button type="button" onClick={() => void handleAttach()} disabled={busy}>
         {busy ? "Linking…" : "Save tree to my account"}

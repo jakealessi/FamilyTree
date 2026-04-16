@@ -10,7 +10,6 @@ import Link from "next/link";
 import {
   AlertCircle,
   ArchiveRestore,
-  GitBranch,
   Loader2,
   Lock,
   PencilLine,
@@ -772,10 +771,7 @@ export function TreeWorkspace({
             aria-busy="true"
             aria-live="polite"
           />
-          <p className="text-lg font-semibold text-[var(--ink-strong)]">Opening your family tree</p>
-          <p className="mt-2 text-sm text-[var(--ink-soft)]">
-            Verifying your link and loading people and relationships.
-          </p>
+          <p className="text-lg font-semibold text-[var(--ink-strong)]">Loading…</p>
         </Card>
       </div>
     );
@@ -785,64 +781,33 @@ export function TreeWorkspace({
     return (
       <div className="mx-auto grid min-h-[72vh] max-w-5xl items-center gap-6 px-4 py-10 lg:grid-cols-[1.15fr_0.85fr]">
         <Card className="space-y-5">
-          <Badge className="w-fit bg-[color:rgba(42,74,47,0.1)] text-[var(--brand-forest)]">
-            Stable private URL
-          </Badge>
-          <h1 className="text-4xl font-semibold tracking-[-0.04em] text-[var(--ink-strong)]">
-            This family tree needs an invite link or recovery code.
+          <h1 className="text-2xl font-semibold tracking-tight text-[var(--ink-strong)] md:text-3xl">
+            Sign in to this tree
           </h1>
-          <p className="text-base leading-8 text-[var(--ink-soft)]">
-            Paste an edit link or view-only link you were sent, or recover a personal link with the
-            code from when you claimed a profile.
-          </p>
-          <div className="rounded-lg border border-[color:var(--border-soft)] bg-white/70 p-4 text-sm text-[var(--ink-soft)]">
-            The stable URL for this tree is
-            <span className="mx-1 font-semibold text-[var(--ink-strong)]">{slug}</span>
-            and it can be reused forever as long as the tree stays active.
-          </div>
+          <p className="font-mono text-sm text-[var(--ink-muted)]">{slug}</p>
           {error ? <p className="text-sm text-[#9A4136]">{error}</p> : null}
           <Link href="/" className="text-sm font-semibold text-[var(--brand-forest)]">
-            Create a new family tree instead
+            New tree
           </Link>
         </Card>
 
         <div className="space-y-6">
           <Card>
-            <div className="mb-4 flex items-center gap-3">
-              <div className="flex size-10 items-center justify-center rounded-lg bg-[color:rgba(42,74,47,0.1)] text-[var(--brand-forest)]">
-                <Lock className="size-5" />
-              </div>
-              <div>
-                <h2 className="font-semibold text-[var(--ink-strong)]">Use an invite link</h2>
-                <p className="text-sm text-[var(--ink-muted)]">
-                  Paste a full URL, or the token from an edit or view link.
-                </p>
-              </div>
-            </div>
+            <h2 className="mb-3 font-semibold text-[var(--ink-strong)]">Invite link</h2>
             <form className="space-y-3" onSubmit={handleUnlock}>
               <Input
                 value={accessCode}
                 onChange={(event) => setAccessCode(event.target.value)}
-                placeholder="https://… or contrib_…"
+                placeholder="URL or token"
               />
               <Button type="submit" className="w-full">
-                Unlock tree
+                Continue
               </Button>
             </form>
           </Card>
 
           <Card>
-            <div className="mb-4 flex items-center gap-3">
-              <div className="flex size-10 items-center justify-center rounded-lg bg-[color:rgba(227,182,97,0.18)] text-[var(--brand-forest)]">
-                <ArchiveRestore className="size-5" />
-              </div>
-              <div>
-                <h2 className="font-semibold text-[var(--ink-strong)]">Recover a personal link</h2>
-                <p className="text-sm text-[var(--ink-muted)]">
-                  Use the recovery code from when you claimed your own profile.
-                </p>
-              </div>
-            </div>
+            <h2 className="mb-3 font-semibold text-[var(--ink-strong)]">Recovery code</h2>
             <form className="space-y-3" onSubmit={handleRecovery}>
               <Input
                 value={recoveryCode}
@@ -852,10 +817,10 @@ export function TreeWorkspace({
               <Input
                 value={editorName}
                 onChange={(event) => setEditorName(event.target.value)}
-                placeholder="Your name on this device"
+                placeholder="Your name"
               />
               <Button type="submit" variant="secondary" className="w-full" disabled={Boolean(busyMessage)}>
-                {busyMessage ?? "Recover personal edit access"}
+                {busyMessage ?? "Recover"}
               </Button>
             </form>
           </Card>
@@ -909,7 +874,7 @@ export function TreeWorkspace({
                       <Input
                         value={search}
                         onChange={(event) => setSearch(event.target.value)}
-                        placeholder="Search by name, city, or occupation"
+                        placeholder="Search"
                         className="pl-10"
                       />
                     </div>
@@ -933,20 +898,17 @@ export function TreeWorkspace({
                   </div>
                 </div>
 
-                <div className="rounded-lg border border-[color:var(--border-soft)] bg-[color:rgba(255,255,255,0.75)] p-4">
+                  <div className="rounded-lg border border-[color:var(--border-soft)] bg-[color:rgba(255,255,255,0.75)] p-4">
                   <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ink-muted)]">
                     <Lock className="size-3.5 text-[var(--brand-forest)]" aria-hidden />
-                    Your editor name
+                    Your name
                   </div>
-                  <p className="mt-1.5 text-sm text-[var(--ink-soft)]">
-                    For the activity log. Saved on this device.
-                  </p>
                   <div className="mt-4 space-y-3">
                     <div className="relative">
                       <Input
                         value={editorName}
                         onChange={(event) => setEditorName(event.target.value)}
-                        placeholder="e.g. Alex (cousin)"
+                        placeholder=""
                       />
                     </div>
                     <div className="flex flex-wrap gap-3">
@@ -1000,10 +962,7 @@ export function TreeWorkspace({
                         aria-hidden
                       />
                       <div>
-                        <p className="font-semibold">Archived after long inactivity.</p>
-                        <p className="mt-1 text-[var(--ink-soft)]">
-                          Owners can reactivate without losing data.
-                        </p>
+                        <p className="font-semibold">Archived</p>
                       </div>
                     </div>
                     {bundle.access.role === "OWNER" ? (
@@ -1113,17 +1072,7 @@ export function TreeWorkspace({
 
             <div className="grid gap-6 xl:grid-cols-2">
               <Card className="space-y-4">
-                <div className="flex items-center gap-3">
-                  <div className="flex size-10 items-center justify-center rounded-lg bg-[color:rgba(42,74,47,0.1)] text-[var(--brand-forest)]">
-                    <GitBranch className="size-5" />
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-semibold text-[var(--ink-strong)]">Relationships</h3>
-                    <p className="text-sm text-[var(--ink-muted)]">
-                      Create new connections and maintain the ones already in the tree.
-                    </p>
-                  </div>
-                </div>
+                <h3 className="text-lg font-semibold text-[var(--ink-strong)]">Relationships</h3>
                 <div className="flex flex-wrap items-center gap-2">
                   {relationshipScopePersonId ? (
                     <Badge className="bg-[color:rgba(42,74,47,0.08)] text-[var(--brand-forest)]">
@@ -1220,7 +1169,7 @@ export function TreeWorkspace({
                       }))
                     }
                     disabled={!canCreatePeople}
-                    placeholder="Optional note about this relationship"
+                    placeholder="Note"
                   />
                   <div className="flex flex-wrap gap-3">
                     <Button type="submit" className="flex-1" disabled={!canCreatePeople}>
@@ -1239,16 +1188,9 @@ export function TreeWorkspace({
 
                 <div className="space-y-3 border-t border-[color:var(--border-soft)] pt-4">
                   <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <h4 className="text-sm font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">
-                        Active connections
-                      </h4>
-                      <p className="mt-1 text-sm text-[var(--ink-soft)]">
-                        {relationshipScopePersonId
-                          ? "Showing only the selected person's relationships."
-                          : "Showing every active relationship in the tree."}
-                      </p>
-                    </div>
+                    <h4 className="text-sm font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">
+                      Connections
+                    </h4>
                     <Badge className="bg-[color:rgba(227,182,97,0.16)] text-[#8D642A]">
                       {visibleRelationships.length}
                     </Badge>
@@ -1256,8 +1198,8 @@ export function TreeWorkspace({
 
                   <div className="max-h-[360px] space-y-3 overflow-y-auto pr-1">
                     {visibleRelationships.length === 0 ? (
-                      <div className="rounded-lg border border-dashed border-[color:var(--border-soft)] bg-white/60 p-4 text-sm text-[var(--ink-soft)]">
-                        No relationships match this view yet. Create one above to connect relatives.
+                      <div className="rounded-lg border border-dashed border-[color:var(--border-soft)] bg-white/60 p-4 text-sm text-[var(--ink-muted)]">
+                        None in this view
                       </div>
                     ) : (
                       visibleRelationships.map((relationship) => (
@@ -1282,14 +1224,8 @@ export function TreeWorkspace({
                             </div>
 
                             {relationship.note ? (
-                              <p className="text-sm leading-7 text-[var(--ink-soft)]">
-                                {relationship.note}
-                              </p>
-                            ) : (
-                              <p className="text-sm text-[var(--ink-muted)]">
-                                No note added for this relationship yet.
-                              </p>
-                            )}
+                              <p className="text-sm text-[var(--ink-soft)]">{relationship.note}</p>
+                            ) : null}
 
                             <div className="flex flex-wrap gap-2">
                               {canManageExistingRelationships ? (
@@ -1315,9 +1251,7 @@ export function TreeWorkspace({
                                 </>
                               ) : (
                                 <div className="rounded-full bg-[color:rgba(42,74,47,0.06)] px-3 py-2 text-xs font-medium text-[var(--ink-muted)]">
-                                  {bundle.access.role === "CONTRIBUTOR"
-                                    ? "Owners approve structural changes in this tree."
-                                    : "Read-only access"}
+                                  {bundle.access.role === "CONTRIBUTOR" ? "Pending approval" : "View only"}
                                 </div>
                               )}
 
@@ -1349,17 +1283,12 @@ export function TreeWorkspace({
                     <div className="flex size-10 items-center justify-center rounded-lg bg-[color:rgba(227,182,97,0.18)] text-[var(--brand-forest)]">
                       <Share2 className="size-5" />
                     </div>
-                    <div>
-                      <h3 className="text-lg font-semibold text-[var(--ink-strong)]">People</h3>
-                      <p className="text-sm text-[var(--ink-muted)]">
-                        {filteredPeople.length} visible in the current search results.
-                      </p>
-                    </div>
+                    <h3 className="text-lg font-semibold text-[var(--ink-strong)]">People</h3>
                   </div>
                   <div className="max-h-[360px] space-y-2 overflow-y-auto pr-1">
                     {filteredPeople.length === 0 ? (
-                      <div className="rounded-lg border border-dashed border-[color:var(--border-soft)] bg-white/60 p-4 text-sm text-[var(--ink-soft)]">
-                        No people match the current search and filters. Clear the filters to see the full tree again.
+                      <div className="rounded-lg border border-dashed border-[color:var(--border-soft)] bg-white/60 p-4 text-sm text-[var(--ink-muted)]">
+                        No matches
                       </div>
                     ) : (
                       filteredPeople.map((person) => (
@@ -1380,9 +1309,11 @@ export function TreeWorkspace({
                               <p className="font-semibold text-[var(--ink-strong)]">
                                 {formatPersonName(person)}
                               </p>
-                              <p className="text-sm text-[var(--ink-muted)]">
-                                {person.currentCity || person.occupation || "No extra details yet"}
-                              </p>
+                              {person.currentCity || person.occupation ? (
+                                <p className="text-sm text-[var(--ink-muted)]">
+                                  {person.currentCity || person.occupation}
+                                </p>
+                              ) : null}
                             </div>
                             <div className="flex flex-wrap justify-end gap-2">
                               {person.claimedBy ? <Badge>Claimed</Badge> : null}
@@ -1403,15 +1334,10 @@ export function TreeWorkspace({
 
             <div className="grid gap-6 xl:grid-cols-2">
               <Card className="space-y-4">
-                <div>
-                  <h3 className="text-lg font-semibold text-[var(--ink-strong)]">Moderation queue</h3>
-                  <p className="text-sm text-[var(--ink-muted)]">
-                    Pending structural edits appear here when contributor changes need review.
-                  </p>
-                </div>
+                <h3 className="text-lg font-semibold text-[var(--ink-strong)]">Moderation</h3>
                 <div className="space-y-3">
                   {bundle.moderationQueue.length === 0 ? (
-                    <p className="text-sm text-[var(--ink-muted)]">No pending structural edits right now.</p>
+                    <p className="text-sm text-[var(--ink-muted)]">Empty</p>
                   ) : (
                     bundle.moderationQueue.map((item) => (
                       <div
@@ -1459,12 +1385,7 @@ export function TreeWorkspace({
               </Card>
 
               <Card className="space-y-4">
-                <div>
-                  <h3 className="text-lg font-semibold text-[var(--ink-strong)]">Recent edits</h3>
-                  <p className="text-sm text-[var(--ink-muted)]">
-                    Owners can roll supported changes back from the activity log.
-                  </p>
-                </div>
+                <h3 className="text-lg font-semibold text-[var(--ink-strong)]">Activity</h3>
                 <div className="space-y-3">
                   {bundle.history.map((entry) => (
                     <div
@@ -1517,17 +1438,11 @@ export function TreeWorkspace({
       {nameGateOpen && bundle?.myEditor?.needsNamePrompt ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 px-4 py-8">
           <Card className="w-full max-w-md space-y-4 p-6 shadow-lg">
-            <div>
-              <h2 className="text-lg font-semibold text-[var(--ink-strong)]">Who is editing?</h2>
-              <p className="mt-2 text-sm leading-7 text-[var(--ink-muted)]">
-                The tree owner will see this name next to your edits in the activity log.
-              </p>
-            </div>
+            <h2 className="text-lg font-semibold text-[var(--ink-strong)]">Your name</h2>
             <form className="space-y-3" onSubmit={handleNameGateSubmit}>
               <Input
                 value={nameGateDraft}
                 onChange={(event) => setNameGateDraft(event.target.value)}
-                placeholder="e.g. Jamie (aunt)"
                 autoFocus
                 required
               />

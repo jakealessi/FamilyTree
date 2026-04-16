@@ -60,11 +60,8 @@ export function FamilyBracket({
   if (bundle.people.length === 0) {
     return (
       <div className="rounded-2xl border border-dashed border-[color:var(--border-soft)] bg-[color:rgba(255,255,255,0.5)] px-6 py-16 text-center">
-        <p className="text-lg font-semibold text-[var(--ink-strong)]">Start your tree</p>
-        <p className="mx-auto mt-2 max-w-md text-sm leading-7 text-[var(--ink-muted)]">
-          {canCreatePeople
-            ? "Use “Add person” above to create the first profile. Then connect relatives with the relationship form below."
-            : "This tree is empty. Open it with edit access to add people."}
+        <p className="text-sm font-medium text-[var(--ink-muted)]">
+          {canCreatePeople ? "Add someone" : "No profiles yet"}
         </p>
       </div>
     );
@@ -73,7 +70,7 @@ export function FamilyBracket({
   if (sortedGens.length === 0) {
     return (
       <div className="rounded-2xl border border-dashed border-[color:var(--border-soft)] bg-[color:rgba(255,255,255,0.5)] px-6 py-10 text-center text-sm text-[var(--ink-muted)]">
-        No people match the current filters. Clear filters or search to see the tree.
+        No matches
       </div>
     );
   }

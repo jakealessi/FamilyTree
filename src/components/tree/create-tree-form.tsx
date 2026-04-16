@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { ArrowRight, CheckCircle2, Leaf, Sprout } from "lucide-react";
+import { ArrowRight, CheckCircle2, Sprout } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -75,24 +75,11 @@ export function CreateTreeForm() {
   const openTreeHref = result ? `/tree/${result.slug}` : "/";
 
   return (
-    <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(320px,360px)]">
+    <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(280px,340px)]">
       <Card className="overflow-hidden p-0">
         <div className="relative">
-          <div className="relative grid gap-8 p-6 md:p-8">
-            <div className="space-y-5">
-              <div className="inline-flex w-fit items-center gap-2 rounded-md border border-[color:var(--border-soft)] bg-white px-4 py-2 text-xs font-semibold uppercase tracking-[0.12em] text-[var(--ink-muted)]">
-                <Leaf className="size-4 text-[var(--brand-forest)]" />
-                Start a tree
-              </div>
-              <div className="space-y-3">
-                <h2 className="text-3xl font-semibold tracking-[-0.04em] text-[var(--ink-strong)] md:text-4xl">
-                  Create a private family tree
-                </h2>
-                <p className="max-w-2xl text-base leading-8 text-[var(--ink-soft)]">
-                  This browser will be remembered as the owner. You can sign in later to save the tree to your account and open it on other devices.
-                </p>
-              </div>
-            </div>
+          <div className="relative grid gap-6 p-6 md:p-8">
+            <h2 className="text-xl font-semibold text-[var(--ink-strong)] md:text-2xl">New tree</h2>
 
             <form
               onSubmit={handleSubmit}
@@ -157,23 +144,14 @@ export function CreateTreeForm() {
                   onChange={(event) => setGenerateViewerLink(event.target.checked)}
                   className="size-4 rounded"
                 />
-                Generate a read-only viewer link
+                Viewer link
               </label>
 
               <div className="md:col-span-2 flex flex-wrap items-center gap-3">
                 <Button type="submit" disabled={isSubmitting} className="gap-2 px-5">
                   <Sprout className="size-4" />
-                  {isSubmitting ? "Creating tree..." : "Create family tree"}
+                  {isSubmitting ? "Creating…" : "Create"}
                 </Button>
-                {result ? (
-                  <Link
-                    href={openTreeHref}
-                    className="inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold text-[var(--brand-forest)]"
-                  >
-                    Open your tree
-                    <ArrowRight className="size-4" />
-                  </Link>
-                ) : null}
               </div>
               {error ? (
                 <p className="md:col-span-2 text-sm text-[#9A4136]">{error}</p>
@@ -186,44 +164,24 @@ export function CreateTreeForm() {
       <div className="space-y-6">
         {result ? (
           <>
-            <Card className="space-y-4">
-              <div className="flex items-start gap-3">
-                <div className="flex size-11 items-center justify-center rounded-2xl bg-[color:rgba(42,74,47,0.1)] text-[var(--brand-forest)]">
+            <Card className="flex flex-col gap-4 p-5">
+              <div className="flex items-center gap-3">
+                <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-[color:rgba(42,74,47,0.1)] text-[var(--brand-forest)]">
                   <CheckCircle2 className="size-5" />
                 </div>
-                <div className="space-y-2">
-                  <h3 className="text-lg font-semibold text-[var(--ink-strong)]">Tree created</h3>
-                  <p className="text-sm leading-7 text-[var(--ink-soft)]">
-                    Open it on this browser to manage it as owner. Use the editor link when you invite relatives to help.
-                  </p>
-                </div>
+                <h3 className="text-lg font-semibold text-[var(--ink-strong)]">Created</h3>
               </div>
               <Link
                 href={openTreeHref}
-                className="inline-flex items-center gap-2 text-sm font-semibold text-[var(--brand-forest)]"
+                className="inline-flex w-fit items-center gap-2 text-sm font-semibold text-[var(--brand-forest)]"
               >
-                Open your tree
+                Open
                 <ArrowRight className="size-4" />
               </Link>
             </Card>
             <ShareLinksCard links={result.links} />
           </>
-        ) : (
-          <Card className="space-y-5">
-            <div className="space-y-2">
-              <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[var(--ink-muted)]">
-                How access works
-              </p>
-              <h2 className="text-2xl font-semibold text-[var(--ink-strong)]">
-                Your browser is the owner key
-              </h2>
-            </div>
-            <div className="space-y-3 text-sm leading-7 text-[var(--ink-soft)]">
-              <p>No separate “owner link” to manage. The device you use to create the tree is trusted until you sign in and attach the tree to an account.</p>
-              <p>Editors use one share link and enter their name once so changes show clearly in history.</p>
-            </div>
-          </Card>
-        )}
+        ) : null}
       </div>
     </div>
   );

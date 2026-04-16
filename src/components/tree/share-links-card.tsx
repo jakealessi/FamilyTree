@@ -18,29 +18,11 @@ export function ShareLinksCard({ links }: { links: ShareLinks }) {
   const [copyError, setCopyError] = useState<string | null>(null);
   const resetCopyTimeoutRef = useRef<number | null>(null);
   const items = [
-    {
-      label: "Tree address",
-      description: "Bookmark this page on your device. On the device that created the tree, you are the owner automatically.",
-      value: links.stable,
-      icon: Link2,
-    },
-    {
-      label: "Invite editors",
-      description: "Anyone with this link can help add people and relationships. They will be asked for their name for the activity log.",
-      value: links.edit,
-      icon: Users,
-    },
-    links.viewer
-      ? {
-          label: "View only",
-          description: "Read-only browsing for relatives who should not change the tree.",
-          value: links.viewer,
-          icon: Eye,
-        }
-      : null,
+    { label: "This page", value: links.stable, icon: Link2 },
+    { label: "Edit link", value: links.edit, icon: Users },
+    links.viewer ? { label: "View only", value: links.viewer, icon: Eye } : null,
   ].filter(Boolean) as Array<{
     label: string;
-    description: string;
     value: string;
     icon: typeof Link2;
   }>;
@@ -67,7 +49,7 @@ export function ShareLinksCard({ links }: { links: ShareLinks }) {
       return;
     }
 
-    setCopyError("Copying was blocked on this device. You can still select a link and copy it manually.");
+    setCopyError("Select the field and copy manually.");
   }
 
   return (
@@ -77,10 +59,7 @@ export function ShareLinksCard({ links }: { links: ShareLinks }) {
           {copiedLabel} copied to clipboard
         </p>
       ) : null}
-      <div>
-        <h3 className="text-base font-semibold text-[var(--ink-strong)]">Sharing</h3>
-        <p className="mt-1 text-sm text-[var(--ink-muted)]">Copy links to invite or bookmark.</p>
-      </div>
+      <h3 className="text-base font-semibold text-[var(--ink-strong)]">Links</h3>
 
       <div className="space-y-3">
         {items.map((item) => {
@@ -98,7 +77,6 @@ export function ShareLinksCard({ links }: { links: ShareLinks }) {
                 <Icon className="size-4 text-[var(--brand-forest)]" aria-hidden />
                 <p className="font-medium text-[var(--ink-strong)]">{item.label}</p>
               </div>
-              <p className="mb-3 text-xs text-[var(--ink-muted)]">{item.description}</p>
               <div className="flex gap-2">
                 <input
                   readOnly

@@ -329,9 +329,7 @@ function PersonEditorPanelContent({
           </Button>
         </div>
         {claimCopyState === "failed" ? (
-          <p className="mt-2 text-xs text-[var(--ink-soft)]">
-            Copying was blocked on this device, so you can select the link above and copy it manually.
-          </p>
+          <p className="mt-2 text-xs text-[var(--ink-muted)]">Copy manually</p>
         ) : null}
       </div>
     );
@@ -340,8 +338,8 @@ function PersonEditorPanelContent({
   function renderOverview() {
     if (!person) {
       return (
-        <div className="rounded-lg border border-dashed border-[color:var(--border-soft)] bg-[color:rgba(0,0,0,0.02)] p-6 text-sm text-[var(--ink-soft)]">
-          Select someone from the tree, or start a new profile to begin building this branch.
+        <div className="rounded-lg border border-dashed border-[color:var(--border-soft)] bg-[color:rgba(0,0,0,0.02)] p-6 text-sm text-[var(--ink-muted)]">
+          Select someone
         </div>
       );
     }
@@ -375,10 +373,9 @@ function PersonEditorPanelContent({
                 <h3 className="mt-3 text-2xl font-semibold text-[var(--ink-strong)]">
                   {formatPersonName(person)}
                 </h3>
-                <p className="mt-2 text-sm leading-7 text-[var(--ink-soft)]">
-                  {person.bio ||
-                    "This profile is ready for family memories, milestones, and the details that make the person feel real."}
-                </p>
+                {person.bio ? (
+                  <p className="mt-2 text-sm leading-7 text-[var(--ink-soft)]">{person.bio}</p>
+                ) : null}
               </div>
             </div>
 
@@ -391,24 +388,24 @@ function PersonEditorPanelContent({
               <OverviewFact
                 icon={<MapPin className="size-4 text-[var(--ink-muted)]" />}
                 label="Location"
-                value={person.currentCity || person.birthplace || "No location added yet"}
+                value={person.currentCity || person.birthplace || "—"}
               />
               <OverviewFact
                 icon={<Briefcase className="size-4 text-[var(--ink-muted)]" />}
                 label="Occupation"
-                value={person.occupation || "Not added yet"}
+                value={person.occupation || "—"}
               />
               <OverviewFact
                 icon={<GraduationCap className="size-4 text-[var(--ink-muted)]" />}
                 label="Education"
-                value={person.education || "Not added yet"}
+                value={person.education || "—"}
               />
             </div>
           </div>
         </div>
 
         <div className="grid gap-4">
-          <ProfileSection title="Profile snapshot" description="Quick details at a glance.">
+          <ProfileSection title="Snapshot">
             <div className="grid gap-3 sm:grid-cols-2">
               <OverviewFact
                 icon={<Sparkles className="size-4 text-[var(--ink-muted)]" />}
@@ -418,12 +415,12 @@ function PersonEditorPanelContent({
               <OverviewFact
                 icon={<Heart className="size-4 text-[var(--ink-muted)]" />}
                 label="Nickname"
-                value={person.nickname || "No nickname added"}
+                value={person.nickname || "—"}
               />
               <OverviewFact
                 icon={<MapPin className="size-4 text-[var(--ink-muted)]" />}
                 label="Birthplace"
-                value={person.birthplace || "No birthplace added"}
+                value={person.birthplace || "—"}
               />
               <OverviewFact
                 icon={<Lock className="size-4 text-[var(--ink-muted)]" />}
@@ -434,7 +431,7 @@ function PersonEditorPanelContent({
           </ProfileSection>
 
           {person.favoriteQuote ? (
-            <ProfileSection title="Favorite quote" description="A personal line worth keeping.">
+            <ProfileSection title="Quote">
               <div className="rounded-lg border border-[color:var(--border-soft)] bg-white/72 px-5 py-4">
                 <p className="flex items-start gap-3 text-sm leading-7 text-[var(--ink-strong)]">
                   <Quote className="mt-1 size-4 shrink-0 text-[var(--ink-muted)]" />
@@ -445,10 +442,7 @@ function PersonEditorPanelContent({
           ) : null}
 
           {person.occupation || person.education || hobbyTags.length > 0 ? (
-            <ProfileSection
-              title="Work, learning, and interests"
-              description="The details that make the profile feel lived in."
-            >
+            <ProfileSection title="Work & interests">
               <div className="space-y-4">
                 {person.occupation ? (
                   <div>
@@ -492,14 +486,9 @@ function PersonEditorPanelContent({
           ) : null}
 
           <div className="grid gap-4 lg:grid-cols-2">
-            <ProfileSection
-              title="Life events"
-              description="Milestones, moments, and family memories."
-            >
+            <ProfileSection title="Life events">
               {lifeEvents.length === 0 ? (
-                <p className="text-sm text-[var(--ink-soft)]">
-                  No life events have been added yet.
-                </p>
+                <p className="text-sm text-[var(--ink-muted)]">—</p>
               ) : (
                 <div className="space-y-3">
                   {lifeEvents.map((event) => (
@@ -514,12 +503,9 @@ function PersonEditorPanelContent({
               )}
             </ProfileSection>
 
-            <ProfileSection
-              title="Notes and context"
-              description="Private or family-shared notes connected to the profile."
-            >
+            <ProfileSection title="Notes">
               {notes.length === 0 ? (
-                <p className="text-sm text-[var(--ink-soft)]">No notes have been added yet.</p>
+                <p className="text-sm text-[var(--ink-muted)]">—</p>
               ) : (
                 <div className="space-y-3">
                   {notes.map((note) => (
@@ -535,14 +521,9 @@ function PersonEditorPanelContent({
             </ProfileSection>
           </div>
 
-          <ProfileSection
-            title="Media"
-            description="Photos and keepsakes already attached to this profile."
-          >
+          <ProfileSection title="Media">
             {mediaItems.length === 0 ? (
-              <div className="rounded-lg border border-dashed border-[color:var(--border-soft)] bg-white/60 p-4 text-sm text-[var(--ink-soft)]">
-                No media has been added yet.
-              </div>
+              <p className="text-sm text-[var(--ink-muted)]">—</p>
             ) : (
               <div className="grid gap-3 sm:grid-cols-2">
                 {mediaItems.slice(0, 4).map((item) => (
@@ -572,12 +553,12 @@ function PersonEditorPanelContent({
             className="border-l-2 border-[var(--border-soft)] pl-3 text-sm text-[var(--ink-muted)]"
             role="status"
           >
-            View only — this link cannot edit profiles.
+            View only
           </p>
         ) : null}
         {canEdit && formDirty ? (
           <p className="text-xs font-medium text-[#8D642A]" role="status">
-            Unsaved changes — save below.
+            Unsaved
           </p>
         ) : null}
         <div className="grid gap-3 sm:grid-cols-2">
@@ -588,7 +569,6 @@ function PersonEditorPanelContent({
               value={form.firstName}
               disabled={!canEdit}
               onChange={(event) => updateField("firstName", event.target.value)}
-              placeholder="e.g. Maya"
             />
           </div>
           <div>
@@ -597,7 +577,6 @@ function PersonEditorPanelContent({
               value={form.middleName}
               disabled={!canEdit}
               onChange={(event) => updateField("middleName", event.target.value)}
-              placeholder="Optional"
             />
           </div>
           <div>
@@ -606,7 +585,6 @@ function PersonEditorPanelContent({
               value={form.lastName}
               disabled={!canEdit}
               onChange={(event) => updateField("lastName", event.target.value)}
-              placeholder="e.g. Rivera"
             />
           </div>
           <div>
@@ -823,17 +801,10 @@ function PersonEditorPanelContent({
 
     return (
       <div className="space-y-4 rounded-lg border border-[color:var(--border-soft)] bg-white p-4">
-        <div className="space-y-2">
-          <h3 className="text-base font-semibold text-[var(--ink-strong)]">Photos and media</h3>
-          <p className="text-sm text-[var(--ink-soft)]">
-            Add profile and gallery photos so the tree feels more personal for everyone.
-          </p>
-        </div>
+        <h3 className="text-base font-semibold text-[var(--ink-strong)]">Media</h3>
 
         {mediaItems.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-[color:var(--border-soft)] bg-white/60 p-4 text-sm text-[var(--ink-soft)]">
-            No media has been uploaded yet.
-          </div>
+          <p className="text-sm text-[var(--ink-muted)]">—</p>
         ) : (
           <div className="grid gap-3 sm:grid-cols-2">
             {mediaItems.map((item) => (
@@ -900,9 +871,6 @@ function PersonEditorPanelContent({
           <h2 className="text-xl font-semibold text-[var(--ink-strong)] md:text-2xl">
             {person ? formatPersonName(person) : "New person"}
           </h2>
-          {!person ? (
-            <p className="mt-1 text-sm text-[var(--ink-muted)]">Name and details — save when ready.</p>
-          ) : null}
         </div>
 
         {person ? (
