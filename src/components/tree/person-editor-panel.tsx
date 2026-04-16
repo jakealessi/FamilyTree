@@ -7,6 +7,7 @@ import { Camera, Crown, Trash2, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input, fieldClassName } from "@/components/ui/input";
+import type { StarterSpacePreset } from "@/lib/shared/starter-spaces";
 import { Textarea } from "@/components/ui/textarea";
 import { GENDER_OPTIONS, LIFE_STATUS_OPTIONS } from "@/lib/shared/constants";
 import { arrayToLines, formatPersonName, linesToArray } from "@/lib/shared/utils";
@@ -16,6 +17,7 @@ type PersonRecord = TreeBundle["people"][number];
 
 type PersonEditorPanelProps = {
   person: PersonRecord | null;
+  starterPreset: StarterSpacePreset | null;
   canEdit: boolean;
   canDelete: boolean;
   canClaim: boolean;
@@ -32,7 +34,7 @@ type PersonEditorPanelProps = {
   }) => Promise<void>;
 };
 
-function formStateFromPerson(person: PersonRecord | null) {
+function formStateFromPerson(person: PersonRecord | null, starterPreset: StarterSpacePreset | null) {
   return {
     firstName: person?.firstName ?? "",
     middleName: person?.middleName ?? "",
@@ -54,15 +56,20 @@ function formStateFromPerson(person: PersonRecord | null) {
     profilePhotoUrl: person?.profilePhotoUrl ?? "",
     lifeEventsText: arrayToLines(person?.lifeEvents),
     notesText: arrayToLines(person?.notes),
-    branchKey: person?.branchKey ?? "",
+    branchKey: person?.branchKey ?? starterPreset?.branchKey ?? "",
     generation:
-      typeof person?.generation === "number" ? String(person.generation) : "",
+      typeof person?.generation === "number"
+        ? String(person.generation)
+        : starterPreset
+          ? String(starterPreset.generation)
+          : "",
     isPrivate: person?.isPrivate ?? true,
   };
 }
 
 export function PersonEditorPanel({
   person,
+  starterPreset,
   canEdit,
   canDelete,
   canClaim,
@@ -73,15 +80,15 @@ export function PersonEditorPanel({
   onClaim,
   onUpload,
 }: PersonEditorPanelProps) {
-  const [form, setForm] = useState(() => formStateFromPerson(person));
+  const [form, setForm] = useState(() => formStateFromPerson(person, starterPreset));
   const [uploadType, setUploadType] = useState<"PROFILE" | "GALLERY">("PROFILE");
   const [uploadCaption, setUploadCaption] = useState("");
   const [uploadUrl, setUploadUrl] = useState("");
   const [uploadFile, setUploadFile] = useState<File | null>(null);
 
   useEffect(() => {
-    setForm(formStateFromPerson(person));
-  }, [person]);
+    setForm(formStateFromPerson(person, starterPreset));
+  }, [person, starterPreset]);
 
   function updateField<Key extends keyof typeof form>(key: Key, value: (typeof form)[Key]) {
     setForm((current) => ({
@@ -114,8 +121,8 @@ export function PersonEditorPanel({
       lifeEvents: linesToArray(form.lifeEventsText),
       notes: linesToArray(form.notesText),
       galleryPhotos: person?.galleryPhotos ?? [],
-      generation: form.generation ? Number(form.generation) : null,
-      branchKey: form.branchKey || null,
+      generation: form.generation ? Number(form.generation) : starterPreset?.generation ?? null,
+      branchKey: form.branchKey || starterPreset?.branchKey || null,
       isPrivate: form.isPrivate,
     });
   }
@@ -140,11 +147,13 @@ export function PersonEditorPanel({
           {person ? "Profile details" : "New profile"}
         </p>
         <h2 className="text-2xl font-semibold text-[var(--ink-strong)]">
-          {person ? formatPersonName(person) : "Add a relative"}
+          {person ? formatPersonName(person) : starterPreset?.title ?? "Add a relative"}
         </h2>
         <p className="text-sm text-[var(--ink-soft)]">
-          Fill in as much or as little as your family wants now. Every profile can grow over
-          time.
+          {person
+            ? "Fill in as much or as little as your family wants now. Every profile can grow over time."
+            : starterPreset?.subtitle ??
+              "Fill in as much or as little as your family wants now. Every profile can grow over time."}
         </p>
       </div>
 

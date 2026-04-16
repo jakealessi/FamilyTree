@@ -33,6 +33,7 @@ import {
   storeSession,
 } from "@/lib/client/local-identity";
 import { ROLE_LABELS, RELATIONSHIP_OPTIONS, VIEW_MODE_OPTIONS } from "@/lib/shared/constants";
+import type { StarterSpacePreset } from "@/lib/shared/starter-spaces";
 import { formatPersonName } from "@/lib/shared/utils";
 import type { TreeBundle, WorkspaceViewMode } from "@/types/family-tree";
 
@@ -128,6 +129,7 @@ export function TreeWorkspace({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedPersonId, setSelectedPersonId] = useState<string | null>(null);
+  const [starterPreset, setStarterPreset] = useState<StarterSpacePreset | null>(null);
   const [viewMode, setViewMode] = useState<WorkspaceViewMode>("artistic");
   const [search, setSearch] = useState("");
   const [accessCode, setAccessCode] = useState("");
@@ -371,6 +373,7 @@ export function TreeWorkspace({
       (responsePayload) => {
         const nextPerson = (responsePayload as { person?: { id: string } }).person;
         if (!selectedPerson && nextPerson?.id) {
+          setStarterPreset(null);
           setSelectedPersonId(nextPerson.id);
         }
       },
@@ -737,6 +740,7 @@ export function TreeWorkspace({
                     variant="outline"
                     className="gap-2"
                     onClick={() => {
+                      setStarterPreset(null);
                       setSelectedPersonId(NEW_PERSON_ID);
                       setClaimResult(null);
                     }}
@@ -762,6 +766,7 @@ export function TreeWorkspace({
                   variant="ghost"
                   onClick={() => {
                     clearStoredSession(slug);
+                    setStarterPreset(null);
                     setSelectedPersonId(null);
                     setClaimResult(null);
                     setError(null);
@@ -825,7 +830,16 @@ export function TreeWorkspace({
                 viewMode={viewMode}
                 searchQuery={deferredSearch}
                 selectedPersonId={selectedPersonId}
-                onSelectPerson={(personId) => setSelectedPersonId(personId)}
+                canCreatePeople={canCreatePeople}
+                onSelectPerson={(personId) => {
+                  setStarterPreset(null);
+                  setSelectedPersonId(personId);
+                }}
+                onSelectStarter={(preset) => {
+                  setStarterPreset(preset);
+                  setSelectedPersonId(NEW_PERSON_ID);
+                  setClaimResult(null);
+                }}
               />
             </Card>
 
@@ -937,7 +951,10 @@ export function TreeWorkspace({
                       <button
                         key={person.id}
                         type="button"
-                        onClick={() => setSelectedPersonId(person.id)}
+                        onClick={() => {
+                          setStarterPreset(null);
+                          setSelectedPersonId(person.id);
+                        }}
                         className={`w-full rounded-2xl border px-4 py-3 text-left transition ${
                           selectedPersonId === person.id
                             ? "border-[color:var(--brand-amber)] bg-[color:rgba(255,248,234,0.88)]"
@@ -1062,6 +1079,7 @@ export function TreeWorkspace({
 
           <PersonEditorPanel
             person={selectedPerson}
+            starterPreset={starterPreset}
             canEdit={Boolean(canEditSelected)}
             canDelete={Boolean(canDeleteSelected)}
             canClaim={Boolean(canClaimSelected)}

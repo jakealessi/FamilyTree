@@ -17,11 +17,110 @@ import {
   buildFamilyGraph,
   type PersonNodeData,
 } from "@/lib/shared/graph";
+import {
+  STARTER_SPACE_PRESETS,
+  type StarterSpacePreset,
+} from "@/lib/shared/starter-spaces";
 import { formatDateRange, formatPersonName } from "@/lib/shared/utils";
 import type { TreeBundle, WorkspaceViewMode } from "@/types/family-tree";
 
 type CanopyFlowNode = Node<PersonNodeData, "canopy">;
 type ClassicFlowNode = Node<PersonNodeData, "classic">;
+
+function StarterSpaceButton({
+  preset,
+  viewMode,
+  canCreatePeople,
+  onSelectStarter,
+}: {
+  preset: StarterSpacePreset;
+  viewMode: WorkspaceViewMode;
+  canCreatePeople: boolean;
+  onSelectStarter: (preset: StarterSpacePreset) => void;
+}) {
+  const positionClassName =
+    viewMode === "artistic"
+      ? preset.artisticPositionClassName
+      : preset.classicPositionClassName;
+  const isArtistic = viewMode === "artistic";
+
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        if (canCreatePeople) {
+          onSelectStarter(preset);
+        }
+      }}
+      disabled={!canCreatePeople}
+      className={`group pointer-events-auto absolute z-20 transition ${
+        canCreatePeople ? "cursor-pointer" : "cursor-not-allowed opacity-75"
+      } ${positionClassName}`}
+    >
+      {isArtistic ? (
+        <div className="relative w-[136px]">
+          <div className="pointer-events-none absolute left-1/2 top-[86px] h-[52px] w-[6px] -translate-x-1/2 rounded-full bg-[linear-gradient(180deg,rgba(117,83,58,0.84),rgba(88,58,39,0.92))]" />
+          <div className="rounded-[42%_58%_52%_48%/52%_40%_60%_48%] border-2 border-dashed border-[rgba(122,147,79,0.6)] bg-[radial-gradient(circle_at_35%_24%,rgba(255,255,255,0.44),rgba(244,250,234,0.86)_24%,rgba(217,231,186,0.9)_58%,rgba(179,205,137,0.9))] px-4 pb-6 pt-5 text-center shadow-[0_24px_48px_-34px_rgba(91,120,58,0.62)] transition duration-300 group-hover:-translate-y-1 group-hover:shadow-[0_28px_54px_-34px_rgba(91,120,58,0.76)]">
+            <div className="mx-auto flex size-12 items-center justify-center rounded-full border border-white/55 bg-white/32 text-[var(--brand-forest)]">
+              <Sprout className="size-5" />
+            </div>
+            <p className="mt-3 text-sm font-semibold text-[var(--ink-strong)]">{preset.title}</p>
+            <p className="mt-1 text-xs leading-5 text-[var(--ink-soft)]">{preset.subtitle}</p>
+          </div>
+        </div>
+      ) : (
+        <div className="w-[180px] rounded-[28px] border-2 border-dashed border-[rgba(128,115,91,0.45)] bg-white/78 px-4 py-5 text-left shadow-[0_18px_44px_-36px_rgba(70,54,37,0.7)] transition duration-300 group-hover:-translate-y-1 group-hover:bg-white">
+          <p className="text-sm font-semibold text-[var(--ink-strong)]">{preset.title}</p>
+          <p className="mt-1 text-xs leading-5 text-[var(--ink-soft)]">{preset.subtitle}</p>
+        </div>
+      )}
+    </button>
+  );
+}
+
+function EmptyStarterOverlay({
+  viewMode,
+  canCreatePeople,
+  onSelectStarter,
+}: {
+  viewMode: WorkspaceViewMode;
+  canCreatePeople: boolean;
+  onSelectStarter: (preset: StarterSpacePreset) => void;
+}) {
+  const isArtistic = viewMode === "artistic";
+
+  return (
+    <div className="pointer-events-none absolute inset-0 z-10">
+      <div
+        className={`absolute left-6 top-6 max-w-sm rounded-[28px] border border-white/45 px-5 py-4 shadow-[0_24px_60px_-42px_rgba(66,50,33,0.48)] backdrop-blur-sm ${
+          isArtistic ? "bg-[rgba(255,249,239,0.74)]" : "bg-[rgba(255,255,255,0.88)]"
+        }`}
+      >
+        <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[var(--ink-muted)]">
+          Start Here
+        </p>
+        <p className="mt-2 text-lg font-semibold text-[var(--ink-strong)]">
+          Fill the first blank spaces in the family tree.
+        </p>
+        <p className="mt-2 text-sm leading-6 text-[var(--ink-soft)]">
+          {canCreatePeople
+            ? "Tap a blank leaf or diagram card to plant the first relatives, then keep building from there."
+            : "This tree has no people yet. Open it with an owner or contributor link to fill the starter spaces."}
+        </p>
+      </div>
+
+      {STARTER_SPACE_PRESETS.map((preset) => (
+        <StarterSpaceButton
+          key={preset.id}
+          preset={preset}
+          viewMode={viewMode}
+          canCreatePeople={canCreatePeople}
+          onSelectStarter={onSelectStarter}
+        />
+      ))}
+    </div>
+  );
+}
 
 function SilhouetteNode() {
   return (
@@ -213,7 +312,9 @@ type FamilyFlowProps = {
   viewMode: WorkspaceViewMode;
   searchQuery: string;
   selectedPersonId: string | null;
+  canCreatePeople: boolean;
   onSelectPerson: (personId: string) => void;
+  onSelectStarter: (preset: StarterSpacePreset) => void;
 };
 
 export function FamilyFlow({
@@ -221,7 +322,9 @@ export function FamilyFlow({
   viewMode,
   searchQuery,
   selectedPersonId,
+  canCreatePeople,
   onSelectPerson,
+  onSelectStarter,
 }: FamilyFlowProps) {
   const { nodes, edges } = buildFamilyGraph(bundle, viewMode, searchQuery, selectedPersonId);
   const isArtistic = viewMode === "artistic";
@@ -240,6 +343,14 @@ export function FamilyFlow({
           <div className="absolute right-[10%] top-[6%] h-52 w-52 rounded-full bg-[radial-gradient(circle,rgba(162,191,116,0.24),transparent_72%)] blur-xl" />
           <div className="absolute inset-x-0 bottom-0 h-24 bg-[linear-gradient(180deg,transparent,rgba(115,85,58,0.12))]" />
         </div>
+      ) : null}
+
+      {bundle.people.length === 0 ? (
+        <EmptyStarterOverlay
+          viewMode={viewMode}
+          canCreatePeople={canCreatePeople}
+          onSelectStarter={onSelectStarter}
+        />
       ) : null}
 
       <ReactFlow
