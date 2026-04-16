@@ -69,6 +69,29 @@ a {
   fill: var(--ink-muted);
 }
 
+.family-flow--artistic .react-flow__node {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+}
+
+.family-flow--artistic .react-flow__node:focus,
+.family-flow--artistic .react-flow__node:focus-visible {
+  outline: none;
+}
+
+.family-flow--artistic .react-flow__node-silhouette {
+  pointer-events: none;
+}
+
+.family-flow--artistic .react-flow__edge-path {
+  filter: drop-shadow(0 8px 16px rgba(89, 63, 44, 0.12));
+}
+
+.family-flow--artistic .react-flow__panel {
+  backdrop-filter: blur(10px);
+}
+
 img {
   display: block;
 }
