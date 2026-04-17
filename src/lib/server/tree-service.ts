@@ -7,7 +7,6 @@ export function personDataFromInput(input: {
   middleName?: string | null;
   lastName?: string | null;
   maidenName?: string | null;
-  displayName?: string | null;
   nickname?: string | null;
   gender?: Gender | "UNSPECIFIED" | "FEMALE" | "MALE" | "NON_BINARY" | "OTHER";
   lifeStatus?: LifeStatus | "UNKNOWN" | "LIVING" | "DECEASED";
@@ -24,8 +23,6 @@ export function personDataFromInput(input: {
   galleryPhotos?: string[];
   lifeEvents?: string[];
   notes?: string[];
-  generation?: number | null;
-  branchKey?: string | null;
   layoutX?: number | null;
   layoutY?: number | null;
   isPrivate?: boolean;
@@ -35,7 +32,6 @@ export function personDataFromInput(input: {
     middleName: normalizeOptionalText(input.middleName),
     lastName: normalizeOptionalText(input.lastName),
     maidenName: normalizeOptionalText(input.maidenName),
-    displayName: normalizeOptionalText(input.displayName),
     nickname: normalizeOptionalText(input.nickname),
     gender: input.gender ?? Gender.UNSPECIFIED,
     lifeStatus: input.lifeStatus ?? LifeStatus.UNKNOWN,
@@ -52,8 +48,6 @@ export function personDataFromInput(input: {
     galleryPhotos: toStringArray(input.galleryPhotos),
     lifeEvents: toStringArray(input.lifeEvents),
     notes: toStringArray(input.notes),
-    generation: input.generation ?? null,
-    branchKey: normalizeOptionalText(input.branchKey),
     layoutX: input.layoutX ?? null,
     layoutY: input.layoutY ?? null,
     isPrivate: input.isPrivate ?? true,

@@ -36,7 +36,7 @@ import {
 } from "@/lib/client/local-identity";
 import { readResponseJson } from "@/lib/client/response-json";
 import { LIFE_STATUS_OPTIONS, ROLE_LABELS } from "@/lib/shared/constants";
-import { formatBranchLabel, formatPersonName } from "@/lib/shared/utils";
+import { formatPersonName } from "@/lib/shared/utils";
 import type { TreeBundle } from "@/types/family-tree";
 
 import { FamilyBracket } from "./family-bracket";
@@ -144,18 +144,14 @@ export function TreeWorkspace({
   const [editorName, setEditorName] = useState("");
   const [lifeStatusFilter, setLifeStatusFilter] = useState<LifeStatusFilter>("ALL");
   const [claimFilter, setClaimFilter] = useState<ClaimFilter>("ALL");
-  const [branchFilter, setBranchFilter] = useState("ALL");
   const [pendingParentId, setPendingParentId] = useState<string | null>(null);
+  const [pendingChildId, setPendingChildId] = useState<string | null>(null);
   const [personEditorOpen, setPersonEditorOpen] = useState(false);
   const [claimResult, setClaimResult] = useState<ClaimResult | null>(null);
   const [busyMessage, setBusyMessage] = useState<string | null>(null);
   const [nameGateOpen, setNameGateOpen] = useState(false);
   const [nameGateDraft, setNameGateDraft] = useState("");
   const deferredSearch = useDeferredValue(search);
-
-  const branchOptions = bundle
-    ? ["ALL", ...new Set(bundle.people.map((person) => person.branchKey ?? "UNASSIGNED"))]
-    : ["ALL"];
 
   useEffect(() => {
     const stored = getStoredSession(slug);
@@ -224,17 +220,13 @@ export function TreeWorkspace({
             const matchesClaim =
               claimFilter === "ALL" ||
               (claimFilter === "CLAIMED" ? Boolean(person.claimedBy) : !person.claimedBy);
-            const effectiveBranchKey = person.branchKey ?? "UNASSIGNED";
-            const matchesBranch =
-              branchFilter === "ALL" || effectiveBranchKey === branchFilter;
 
-            return matchesQuery && matchesLifeStatus && matchesClaim && matchesBranch;
+            return matchesQuery && matchesLifeStatus && matchesClaim;
           },
         );
       })();
   const filteredPersonIds = filteredPeople.map((person) => person.id);
-  const filtersActive =
-    lifeStatusFilter !== "ALL" || claimFilter !== "ALL" || branchFilter !== "ALL";
+  const filtersActive = lifeStatusFilter !== "ALL" || claimFilter !== "ALL";
   const searchActive = deferredSearch.trim().length > 0;
   const viewNarrowed = filtersActive || searchActive;
 
@@ -308,6 +300,7 @@ export function TreeWorkspace({
   function closePersonEditor() {
     setPersonEditorOpen(false);
     setPendingParentId(null);
+    setPendingChildId(null);
     if (selectedPersonId === NEW_PERSON_ID && bundle) {
       const personIds = new Set(bundle.people.map((person) => person.id));
       const fallback =
@@ -443,6 +436,7 @@ export function TreeWorkspace({
         if (!selectedPerson && nextPerson?.id) {
           setSelectedPersonId(nextPerson.id);
           setPendingParentId(null);
+          setPendingChildId(null);
           setPersonEditorOpen(false);
         }
       },
@@ -809,6 +803,7 @@ export function TreeWorkspace({
                       className="gap-2"
                       onClick={() => {
                         setPendingParentId(null);
+                        setPendingChildId(null);
                         setSelectedPersonId(NEW_PERSON_ID);
                         setPersonEditorOpen(true);
                         setClaimResult(null);
@@ -938,7 +933,7 @@ export function TreeWorkspace({
                   )}
                 </p>
               </div>
-              <div className="grid gap-3 border-t border-[color:var(--border-soft)] pt-4 md:grid-cols-[repeat(3,minmax(0,1fr))_auto]">
+              <div className="grid gap-3 border-t border-[color:var(--border-soft)] pt-4 md:grid-cols-[repeat(2,minmax(0,1fr))_auto]">
                 <select
                   value={lifeStatusFilter}
                   onChange={(event) =>
@@ -962,24 +957,12 @@ export function TreeWorkspace({
                   <option value="CLAIMED">Claimed only</option>
                   <option value="UNCLAIMED">Unclaimed only</option>
                 </select>
-                <select
-                  value={branchFilter}
-                  onChange={(event) => setBranchFilter(event.target.value)}
-                  className={fieldClassName}
-                >
-                  {branchOptions.map((option) => (
-                    <option key={option} value={option}>
-                      {option === "ALL" ? "All branches" : formatBranchLabel(option)}
-                    </option>
-                  ))}
-                </select>
                 <Button
                   type="button"
                   variant="outline"
                   onClick={() => {
                     setLifeStatusFilter("ALL");
                     setClaimFilter("ALL");
-                    setBranchFilter("ALL");
                   }}
                   disabled={!filtersActive}
                 >
@@ -996,11 +979,13 @@ export function TreeWorkspace({
                 }}
                 onEditPerson={(personId) => {
                   setPendingParentId(null);
+                  setPendingChildId(null);
                   setSelectedPersonId(personId);
                   setPersonEditorOpen(true);
                 }}
-                onAddPerson={({ parentPersonId }) => {
+                onAddPerson={({ parentPersonId, childPersonId }) => {
                   setPendingParentId(parentPersonId ?? null);
+                  setPendingChildId(childPersonId ?? null);
                   setSelectedPersonId(NEW_PERSON_ID);
                   setPersonEditorOpen(true);
                   setClaimResult(null);
@@ -1030,6 +1015,7 @@ export function TreeWorkspace({
                           type="button"
                           onClick={() => {
                             setPendingParentId(null);
+                            setPendingChildId(null);
                             setSelectedPersonId(person.id);
                             setPersonEditorOpen(true);
                           }}
@@ -1052,11 +1038,6 @@ export function TreeWorkspace({
                             </div>
                             <div className="flex flex-wrap justify-end gap-2">
                               {person.claimedBy ? <Badge>Claimed</Badge> : null}
-                              {person.branchKey ? (
-                                <Badge className="bg-[color:rgba(42,74,47,0.08)] text-[var(--brand-forest)]">
-                                  {formatBranchLabel(person.branchKey)}
-                                </Badge>
-                              ) : null}
                             </div>
                           </div>
                         </button>
@@ -1167,9 +1148,11 @@ export function TreeWorkspace({
             <div className="flex items-center justify-between gap-3 border-b border-[color:var(--border-soft)] px-5 py-4">
               <h2 className="text-lg font-semibold text-[var(--ink-strong)]">
                 {selectedPersonId === NEW_PERSON_ID
-                  ? pendingParentId
-                    ? "Add someone below"
-                    : "Add someone"
+                  ? pendingChildId
+                    ? "Add someone above"
+                    : pendingParentId
+                      ? "Add someone below"
+                      : "Add someone"
                   : formatPersonName(selectedPerson ?? { firstName: "Profile" })}
               </h2>
               <Button type="button" variant="ghost" className="gap-2 px-3 py-2 text-sm" onClick={closePersonEditor}>

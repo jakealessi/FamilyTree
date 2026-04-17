@@ -158,7 +158,6 @@ model Person {
   middleName          String?
   lastName            String?
   maidenName          String?
-  displayName         String?
   nickname            String?
   gender              Gender         @default(UNSPECIFIED)
   lifeStatus          LifeStatus     @default(UNKNOWN)
@@ -175,8 +174,6 @@ model Person {
   galleryPhotos       Json?
   lifeEvents          Json?
   notes               Json?
-  generation          Int?
-  branchKey           String?
   layoutX             Float?
   layoutY             Float?
   isPrivate           Boolean        @default(true)

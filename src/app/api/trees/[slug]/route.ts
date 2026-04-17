@@ -48,7 +48,7 @@ export async function GET(request: Request, context: RouteContext) {
             },
           },
         },
-        orderBy: [{ generation: "asc" }, { lastName: "asc" }, { firstName: "asc" }],
+        orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
       },
       relationships: {
         where: {
@@ -104,7 +104,8 @@ export async function GET(request: Request, context: RouteContext) {
     canEdit && tokens.browserToken
       ? {
           displayName: access.editorIdentity?.displayName ?? null,
-          needsNamePrompt: !access.editorIdentity?.displayName?.trim(),
+          needsNamePrompt:
+            access.role !== "OWNER" && !access.editorIdentity?.displayName?.trim(),
         }
       : undefined;
 
@@ -145,7 +146,6 @@ export async function GET(request: Request, context: RouteContext) {
       middleName: person.middleName,
       lastName: person.lastName,
       maidenName: person.maidenName,
-      displayName: person.displayName,
       nickname: person.nickname,
       gender: person.gender,
       lifeStatus: person.lifeStatus,
@@ -162,8 +162,6 @@ export async function GET(request: Request, context: RouteContext) {
       galleryPhotos: serializeJsonArray(person.galleryPhotos),
       lifeEvents: serializeJsonArray(person.lifeEvents),
       notes: serializeJsonArray(person.notes),
-      generation: person.generation,
-      branchKey: person.branchKey,
       layoutX: person.layoutX,
       layoutY: person.layoutY,
       isPrivate: person.isPrivate,

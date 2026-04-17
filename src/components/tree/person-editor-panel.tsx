@@ -10,7 +10,6 @@ import {
   GraduationCap,
   Heart,
   Loader2,
-  Lock,
   MapPin,
   Quote,
   Sparkles,
@@ -27,7 +26,6 @@ import { copyTextToClipboard } from "@/lib/client/clipboard";
 import { GENDER_OPTIONS, LIFE_STATUS_OPTIONS } from "@/lib/shared/constants";
 import {
   arrayToLines,
-  formatBranchLabel,
   formatDateRange,
   formatPersonName,
   linesToArray,
@@ -61,7 +59,6 @@ function formStateFromPerson(person: PersonRecord | null) {
     middleName: person?.middleName ?? "",
     lastName: person?.lastName ?? "",
     maidenName: person?.maidenName ?? "",
-    displayName: person?.displayName ?? "",
     nickname: person?.nickname ?? "",
     gender: person?.gender ?? "UNSPECIFIED",
     lifeStatus: person?.lifeStatus ?? "UNKNOWN",
@@ -77,24 +74,8 @@ function formStateFromPerson(person: PersonRecord | null) {
     profilePhotoUrl: person?.profilePhotoUrl ?? "",
     lifeEventsText: arrayToLines(person?.lifeEvents),
     notesText: arrayToLines(person?.notes),
-    branchKey: person?.branchKey ?? "",
-    generation: typeof person?.generation === "number" ? String(person.generation) : "",
     isPrivate: person?.isPrivate ?? true,
   };
-}
-
-function normalizeGenerationInput(value: string) {
-  const trimmed = value.trim();
-  if (!trimmed) {
-    return "";
-  }
-
-  const numericPattern = /^-?\d+$/;
-  if (!numericPattern.test(trimmed)) {
-    return null;
-  }
-
-  return trimmed;
 }
 
 function lifeStatusLabel(value: string) {
@@ -170,7 +151,6 @@ function PersonEditorPanelContent({
 }: PersonEditorPanelProps) {
   const [form, setForm] = useState(() => formStateFromPerson(person));
   const [formDirty, setFormDirty] = useState(false);
-  const [generationError, setGenerationError] = useState(false);
   const personSyncKey = useMemo(
     () => (person ? JSON.stringify(formStateFromPerson(person)) : ""),
     [person],
@@ -179,7 +159,6 @@ function PersonEditorPanelContent({
   if (personSyncKey !== lastServerSyncKey && !formDirty) {
     setLastServerSyncKey(personSyncKey);
     setForm(formStateFromPerson(person));
-    setGenerationError(false);
   }
   const [activeTab, setActiveTab] = useState<PanelTab>(person ? "overview" : "edit");
   const [uploadType, setUploadType] = useState<"PROFILE" | "GALLERY">("PROFILE");
@@ -220,9 +199,6 @@ function PersonEditorPanelContent({
 
   function updateField<Key extends keyof typeof form>(key: Key, value: (typeof form)[Key]) {
     setFormDirty(true);
-    if (key === "generation") {
-      setGenerationError(false);
-    }
     setForm((current) => ({
       ...current,
       [key]: value,
@@ -231,19 +207,12 @@ function PersonEditorPanelContent({
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const normalizedGeneration = normalizeGenerationInput(form.generation);
-    if (normalizedGeneration === null) {
-      setGenerationError(true);
-      return;
-    }
-    setGenerationError(false);
 
     await onSave({
       firstName: form.firstName,
       middleName: form.middleName,
       lastName: form.lastName,
       maidenName: form.maidenName,
-      displayName: form.displayName,
       nickname: form.nickname,
       gender: form.gender,
       lifeStatus: form.lifeStatus,
@@ -260,8 +229,6 @@ function PersonEditorPanelContent({
       lifeEvents: linesToArray(form.lifeEventsText),
       notes: linesToArray(form.notesText),
       galleryPhotos: person?.galleryPhotos ?? [],
-      generation: normalizedGeneration ? Number(normalizedGeneration) : null,
-      branchKey: form.branchKey.trim() || null,
       isPrivate: form.isPrivate,
     });
     setFormDirty(false);
@@ -421,11 +388,6 @@ function PersonEditorPanelContent({
                 icon={<MapPin className="size-4 text-[var(--ink-muted)]" />}
                 label="Birthplace"
                 value={person.birthplace || "—"}
-              />
-              <OverviewFact
-                icon={<Lock className="size-4 text-[var(--ink-muted)]" />}
-                label="Branch"
-                value={formatBranchLabel(person.branchKey)}
               />
             </div>
           </ProfileSection>
@@ -588,14 +550,6 @@ function PersonEditorPanelContent({
             />
           </div>
           <div>
-            <label className="mb-2 block text-sm font-medium text-[var(--ink-strong)]">Display name</label>
-            <Input
-              value={form.displayName}
-              disabled={!canEdit}
-              onChange={(event) => updateField("displayName", event.target.value)}
-            />
-          </div>
-          <div>
             <label className="mb-2 block text-sm font-medium text-[var(--ink-strong)]">Nickname</label>
             <Input
               value={form.nickname}
@@ -698,36 +652,6 @@ function PersonEditorPanelContent({
               disabled={!canEdit}
               onChange={(event) => updateField("hobbies", event.target.value)}
             />
-          </div>
-          <div>
-            <label className="mb-2 block text-sm font-medium text-[var(--ink-strong)]">Branch key</label>
-            <Input
-              value={form.branchKey}
-              disabled={!canEdit}
-              onChange={(event) => updateField("branchKey", event.target.value)}
-            />
-          </div>
-          <div>
-            <label className="mb-2 block text-sm font-medium text-[var(--ink-strong)]">Generation</label>
-            <Input
-              inputMode="numeric"
-              value={form.generation}
-              disabled={!canEdit}
-              onChange={(event) => {
-                const normalized = normalizeGenerationInput(event.target.value);
-                if (normalized !== null) {
-                  updateField("generation", normalized);
-                }
-              }}
-            />
-            <p className="mt-2 text-xs text-[var(--ink-muted)]">
-              Use whole numbers only, like 0, 1, or 2.
-            </p>
-            {generationError ? (
-              <p className="mt-2 text-xs font-medium text-[#9A4136]">
-                Fix the generation field (whole numbers only), then save again.
-              </p>
-            ) : null}
           </div>
           <label className="flex items-center gap-3 rounded-lg border border-[color:var(--border-soft)] bg-white/75 px-4 py-3 text-sm text-[var(--ink-strong)]">
             <input
@@ -878,10 +802,6 @@ function PersonEditorPanelContent({
             <Badge className="bg-[color:rgba(42,74,47,0.08)] text-[var(--brand-forest)]">
               {lifeStatusLabel(person.lifeStatus)}
             </Badge>
-            <Badge className="bg-[color:rgba(255,255,255,0.72)] text-[var(--ink-soft)]">
-              {formatBranchLabel(person.branchKey)}
-            </Badge>
-            {typeof person.generation === "number" ? <Badge>Generation {person.generation}</Badge> : null}
             {person.claimedBy ? <Badge>Claimed</Badge> : null}
           </div>
         ) : null}

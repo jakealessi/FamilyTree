@@ -70,26 +70,9 @@ export function formatPersonName(person: {
   firstName?: string | null;
   middleName?: string | null;
   lastName?: string | null;
-  displayName?: string | null;
   maidenName?: string | null;
 }) {
-  if (person.displayName?.trim()) {
-    return person.displayName.trim();
-  }
-
   return [person.firstName, person.middleName, person.lastName]
     .filter(Boolean)
-    .join(" ");
-}
-
-export function formatBranchLabel(branchKey?: string | null) {
-  if (!branchKey) {
-    return "Unassigned";
-  }
-
-  return branchKey
-    .split(/[-_\s]+/)
-    .filter(Boolean)
-    .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
     .join(" ");
 }

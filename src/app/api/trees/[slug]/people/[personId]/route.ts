@@ -18,7 +18,6 @@ function serializePersonSnapshot(person: {
   middleName: string | null;
   lastName: string | null;
   maidenName: string | null;
-  displayName: string | null;
   nickname: string | null;
   gender: string;
   lifeStatus: string;
@@ -35,8 +34,6 @@ function serializePersonSnapshot(person: {
   galleryPhotos: unknown;
   lifeEvents: unknown;
   notes: unknown;
-  generation: number | null;
-  branchKey: string | null;
   layoutX: number | null;
   layoutY: number | null;
   isPrivate: boolean;
@@ -47,7 +44,6 @@ function serializePersonSnapshot(person: {
     middleName: person.middleName,
     lastName: person.lastName,
     maidenName: person.maidenName,
-    displayName: person.displayName,
     nickname: person.nickname,
     gender: person.gender,
     lifeStatus: person.lifeStatus,
@@ -64,8 +60,6 @@ function serializePersonSnapshot(person: {
     galleryPhotos: toStringArray(person.galleryPhotos),
     lifeEvents: toStringArray(person.lifeEvents),
     notes: toStringArray(person.notes),
-    generation: person.generation,
-    branchKey: person.branchKey,
     layoutX: person.layoutX,
     layoutY: person.layoutY,
     isPrivate: person.isPrivate,
@@ -108,7 +102,11 @@ export async function PATCH(request: Request, context: RouteContext) {
   }
 
   const before = serializePersonSnapshot(existing);
-  const { parentPersonId: _parentIgnored, ...personInput } = parsed.data;
+  const {
+    parentPersonId: _parentIgnored,
+    childPersonId: _childIgnored,
+    ...personInput
+  } = parsed.data;
   const nextData = personDataFromInput(personInput);
 
   const person = await prisma.$transaction(async (tx) => {

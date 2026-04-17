@@ -36,7 +36,6 @@ export const personPayloadSchema = z.object({
   middleName: optionalText,
   lastName: optionalText,
   maidenName: optionalText,
-  displayName: optionalText,
   nickname: optionalText,
   gender: z
     .enum(["UNSPECIFIED", "FEMALE", "MALE", "NON_BINARY", "OTHER"])
@@ -56,14 +55,23 @@ export const personPayloadSchema = z.object({
   galleryPhotos: z.array(z.string().trim()).optional().default([]),
   lifeEvents: z.array(z.string().trim()).optional().default([]),
   notes: z.array(z.string().trim()).optional().default([]),
-  generation: z.number().int().nullable().optional(),
-  branchKey: optionalText,
   layoutX: z.number().nullable().optional(),
   layoutY: z.number().nullable().optional(),
   isPrivate: z.boolean().optional().default(true),
   /** When creating a person, links them under this parent (structural PARENT edge). */
   parentPersonId: z.string().trim().min(1).optional().nullable(),
-});
+  /** When creating a person, links them above this child (new person becomes parent) if the child has no parent yet. */
+  childPersonId: z.string().trim().min(1).optional().nullable(),
+})
+  .superRefine((data, ctx) => {
+    if (data.parentPersonId && data.childPersonId) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Use only one of parentPersonId or childPersonId.",
+        path: ["childPersonId"],
+      });
+    }
+  });
 
 export const relationshipPayloadSchema = z.object({
   fromPersonId: z.string().trim().min(1),

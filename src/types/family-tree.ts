@@ -32,7 +32,6 @@ export type TreeBundle = {
     middleName: string | null;
     lastName: string | null;
     maidenName: string | null;
-    displayName: string | null;
     nickname: string | null;
     gender: string;
     lifeStatus: string;
@@ -49,8 +48,6 @@ export type TreeBundle = {
     galleryPhotos: string[];
     lifeEvents: string[];
     notes: string[];
-    generation: number | null;
-    branchKey: string | null;
     layoutX: number | null;
     layoutY: number | null;
     isPrivate: boolean;

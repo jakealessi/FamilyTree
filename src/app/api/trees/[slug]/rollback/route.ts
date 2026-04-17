@@ -163,7 +163,6 @@ export async function POST(request: Request, context: RouteContext) {
               middleName: (before.middleName as string | null) ?? null,
               lastName: (before.lastName as string | null) ?? null,
               maidenName: (before.maidenName as string | null) ?? null,
-              displayName: (before.displayName as string | null) ?? null,
               nickname: (before.nickname as string | null) ?? null,
               gender: (before.gender as never) ?? "UNSPECIFIED",
               lifeStatus: (before.lifeStatus as never) ?? "UNKNOWN",
@@ -184,9 +183,6 @@ export async function POST(request: Request, context: RouteContext) {
                 ? before.lifeEvents.map(String)
                 : [],
               notes: Array.isArray(before.notes) ? before.notes.map(String) : [],
-              generation:
-                typeof before.generation === "number" ? before.generation : null,
-              branchKey: (before.branchKey as string | null) ?? null,
               layoutX: typeof before.layoutX === "number" ? before.layoutX : null,
               layoutY: typeof before.layoutY === "number" ? before.layoutY : null,
               isPrivate: Boolean(before.isPrivate),

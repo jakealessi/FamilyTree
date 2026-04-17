@@ -4,10 +4,14 @@ import { PencilLine, Plus, User } from "lucide-react";
 
 import {
   structuralChildren,
+  structuralParentId,
   visibleRootPersonIds,
 } from "@/lib/shared/bracket-layout";
 import { formatDateRange, formatPersonName } from "@/lib/shared/utils";
 import type { TreeBundle } from "@/types/family-tree";
+
+/** Muted forest green — branch lines */
+const branchLine = "bg-[color:rgba(42,74,47,0.28)]";
 
 function lifeStatusDot(person: TreeBundle["people"][number]) {
   switch (person.lifeStatus) {
@@ -33,10 +37,12 @@ function AddLeaf({
   label,
   onClick,
   narrow,
+  caption,
 }: {
   label: string;
   onClick: () => void;
   narrow?: boolean;
+  caption?: string;
 }) {
   return (
     <button
@@ -49,7 +55,7 @@ function AddLeaf({
     >
       <Plus className="size-4 shrink-0" aria-hidden />
       <span className="text-center text-[11px] font-semibold uppercase tracking-[0.1em]">
-        Add
+        {caption ?? "Add"}
       </span>
     </button>
   );
@@ -62,7 +68,10 @@ type FamilyBracketProps = {
   canCreatePeople: boolean;
   onSelectPerson: (personId: string) => void;
   onEditPerson: (personId: string) => void;
-  onAddPerson: (opts: { parentPersonId?: string | null }) => void;
+  onAddPerson: (opts: {
+    parentPersonId?: string | null;
+    childPersonId?: string | null;
+  }) => void;
 };
 
 function PersonCard({
@@ -81,7 +90,7 @@ function PersonCard({
   const status = lifeStatusDot(person);
   return (
     <div
-      className={`relative min-w-[160px] max-w-[220px] flex-1 rounded-xl border px-3 py-3 transition ${
+      className={`relative z-[1] min-w-[160px] max-w-[220px] flex-1 rounded-xl border px-3 py-3 transition ${
         selected
           ? "border-[color:var(--brand-forest)] bg-[color:rgba(42,74,47,0.08)] shadow-sm ring-1 ring-[color:rgba(42,74,47,0.2)]"
           : "border-[color:var(--border-soft)] bg-white"
@@ -153,7 +162,10 @@ function PersonSubtree({
   canCreatePeople: boolean;
   onSelectPerson: (personId: string) => void;
   onEditPerson: (personId: string) => void;
-  onAddPerson: (opts: { parentPersonId?: string | null }) => void;
+  onAddPerson: (opts: {
+    parentPersonId?: string | null;
+    childPersonId?: string | null;
+  }) => void;
 }) {
   if (visited.has(personId)) {
     return null;
@@ -176,9 +188,22 @@ function PersonSubtree({
     );
 
   const selected = person.id === selectedPersonId;
+  const hasStructuralParent = Boolean(structuralParentId(bundle, person.id));
+  const multiChild = childIds.length > 1;
 
   return (
     <div className="flex flex-col items-center gap-2">
+      {canCreatePeople && !hasStructuralParent ? (
+        <AddLeaf
+          label={`Add someone above ${formatPersonName(person)}`}
+          caption="Above"
+          narrow
+          onClick={() =>
+            onAddPerson({ parentPersonId: null, childPersonId: person.id })
+          }
+        />
+      ) : null}
+
       <PersonCard
         person={person}
         selected={selected}
@@ -190,31 +215,64 @@ function PersonSubtree({
       {canCreatePeople ? (
         <AddLeaf
           label={`Add a child under ${formatPersonName(person)}`}
+          caption="Below"
           narrow
-          onClick={() => onAddPerson({ parentPersonId: person.id })}
+          onClick={() => onAddPerson({ parentPersonId: person.id, childPersonId: null })}
         />
       ) : null}
 
       {childIds.length > 0 ? (
         <div
-          className="mt-1 flex w-full flex-row flex-wrap justify-center gap-4 border-t border-dashed border-[color:var(--border-soft)] pt-4"
+          className="relative mt-1 flex w-full min-w-0 flex-col items-center"
           role="group"
           aria-label={`Descendants of ${formatPersonName(person)}`}
         >
-          {childIds.map((childId) => (
-            <PersonSubtree
-              key={childId}
-              bundle={bundle}
-              personId={childId}
-              visible={visible}
-              visited={visited}
-              selectedPersonId={selectedPersonId}
-              canCreatePeople={canCreatePeople}
-              onSelectPerson={onSelectPerson}
-              onEditPerson={onEditPerson}
-              onAddPerson={onAddPerson}
-            />
-          ))}
+          {/* Vertical stem from parent row to children */}
+          <div
+            className={`h-4 w-[2px] shrink-0 rounded-full ${branchLine}`}
+            aria-hidden
+          />
+
+          <div
+            className={`relative flex w-full min-w-[200px] flex-row flex-wrap justify-center gap-x-8 gap-y-10 px-2 pt-0 ${
+              multiChild ? "" : "pt-1"
+            }`}
+          >
+            {/* Horizontal bar when multiple siblings (classic family-tree fork) */}
+            {multiChild ? (
+              <div
+                className={`pointer-events-none absolute left-[8%] right-[8%] top-0 z-0 mx-auto h-[2px] max-w-[min(56rem,calc(100%-2rem))] rounded-full ${branchLine} md:left-[12%] md:right-[12%]`}
+                aria-hidden
+              />
+            ) : null}
+
+            {childIds.map((childId) => (
+              <div
+                key={childId}
+                className={`relative z-[1] flex min-w-0 flex-col items-center ${
+                  multiChild ? "pt-4" : ""
+                }`}
+              >
+                {multiChild ? (
+                  <div
+                    className={`absolute left-1/2 top-0 h-4 w-[2px] -translate-x-1/2 rounded-full ${branchLine}`}
+                    aria-hidden
+                  />
+                ) : null}
+                <PersonSubtree
+                  bundle={bundle}
+                  personId={childId}
+                  visible={visible}
+                  visited={visited}
+                  selectedPersonId={selectedPersonId}
+                  canCreatePeople={canCreatePeople}
+                  onSelectPerson={onSelectPerson}
+                  onEditPerson={onEditPerson}
+                  onAddPerson={onAddPerson}
+                />
+              </div>
+            ))}
+          </div>
         </div>
       ) : null}
     </div>
@@ -276,7 +334,7 @@ export function FamilyBracket({
   return (
     <div className="overflow-x-auto rounded-2xl border border-[color:var(--border-soft)] bg-[color:rgba(255,255,255,0.45)] p-4 md:p-6">
       <div className="flex min-h-[min(50vh,560px)] min-w-[min(100%,720px)] flex-col items-center justify-start gap-2">
-        <div className="flex flex-row flex-wrap items-start justify-center gap-6 md:gap-10">
+        <div className="flex flex-row flex-wrap items-start justify-center gap-x-10 gap-y-12 md:gap-x-14">
           {roots.map((rootId) => (
             <PersonSubtree
               key={rootId}
