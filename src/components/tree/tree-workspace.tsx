@@ -12,12 +12,10 @@ import {
   ArchiveRestore,
   Loader2,
   Lock,
-  PencilLine,
   Plus,
   RotateCcw,
   Search,
   Share2,
-  Trash2,
   X,
 } from "lucide-react";
 
@@ -37,11 +35,7 @@ import {
   storeSession,
 } from "@/lib/client/local-identity";
 import { readResponseJson } from "@/lib/client/response-json";
-import {
-  LIFE_STATUS_OPTIONS,
-  ROLE_LABELS,
-  RELATIONSHIP_OPTIONS,
-} from "@/lib/shared/constants";
+import { LIFE_STATUS_OPTIONS, ROLE_LABELS } from "@/lib/shared/constants";
 import { formatBranchLabel, formatPersonName } from "@/lib/shared/utils";
 import type { TreeBundle } from "@/types/family-tree";
 
@@ -73,15 +67,6 @@ type LifeStatusFilter = "ALL" | "UNKNOWN" | "LIVING" | "DECEASED";
 type ClaimFilter = "ALL" | "CLAIMED" | "UNCLAIMED";
 
 const NEW_PERSON_ID = "__new_person__";
-
-function createRelationshipDraft(fromPersonId?: string | null) {
-  return {
-    fromPersonId: fromPersonId ?? "",
-    toPersonId: "",
-    type: "PARENT",
-    note: "",
-  };
-}
 
 function personalTokenFromLink(url: string) {
   return new URL(url).searchParams.get("personal");
@@ -139,13 +124,6 @@ function isRollbackSupported(entry: TreeBundle["history"][number]) {
   return false;
 }
 
-function relationshipTypeLabel(type: string) {
-  return (
-    RELATIONSHIP_OPTIONS.find((option) => option.value === type)?.label ??
-    type.toLowerCase().replace(/_/g, " ")
-  );
-}
-
 export function TreeWorkspace({
   slug,
   initialToken = null,
@@ -167,8 +145,8 @@ export function TreeWorkspace({
   const [lifeStatusFilter, setLifeStatusFilter] = useState<LifeStatusFilter>("ALL");
   const [claimFilter, setClaimFilter] = useState<ClaimFilter>("ALL");
   const [branchFilter, setBranchFilter] = useState("ALL");
-  const [relationshipDraft, setRelationshipDraft] = useState(createRelationshipDraft());
-  const [editingRelationshipId, setEditingRelationshipId] = useState<string | null>(null);
+  const [pendingParentId, setPendingParentId] = useState<string | null>(null);
+  const [personEditorOpen, setPersonEditorOpen] = useState(false);
   const [claimResult, setClaimResult] = useState<ClaimResult | null>(null);
   const [busyMessage, setBusyMessage] = useState<string | null>(null);
   const [nameGateOpen, setNameGateOpen] = useState(false);
@@ -295,21 +273,6 @@ export function TreeWorkspace({
   }, [claimResult, selectedPersonId]);
 
   useEffect(() => {
-    if (!bundle || !editingRelationshipId) {
-      return;
-    }
-
-    const relationshipStillExists = bundle.relationships.some(
-      (relationship) => relationship.id === editingRelationshipId,
-    );
-
-    if (!relationshipStillExists) {
-      setEditingRelationshipId(null);
-      setRelationshipDraft(createRelationshipDraft());
-    }
-  }, [bundle, editingRelationshipId]);
-
-  useEffect(() => {
     if (bundle?.myEditor?.needsNamePrompt) {
       setNameGateOpen(true);
       setNameGateDraft((current) => current || getStoredEditorName(slug));
@@ -337,19 +300,23 @@ export function TreeWorkspace({
     Boolean(selectedPerson) &&
     !selectedPerson?.claimedBy &&
     (bundle?.access.role === "OWNER" || bundle?.access.role === "CONTRIBUTOR");
-  const canManageExistingRelationships =
-    bundle?.access.role === "OWNER" ||
-    (bundle?.access.role === "CONTRIBUTOR" && bundle.tree.moderationMode === "OPEN");
-  const relationshipScopePersonId =
-    selectedPersonId && selectedPersonId !== NEW_PERSON_ID ? selectedPersonId : null;
-  const visibleRelationships = bundle
-    ? bundle.relationships.filter((relationship) =>
-        relationshipScopePersonId
-          ? relationship.fromPersonId === relationshipScopePersonId ||
-            relationship.toPersonId === relationshipScopePersonId
-          : true,
-      )
-    : [];
+  const canEditInModal =
+    selectedPersonId === NEW_PERSON_ID
+      ? Boolean(canCreatePeople)
+      : Boolean(canEditSelected);
+
+  function closePersonEditor() {
+    setPersonEditorOpen(false);
+    setPendingParentId(null);
+    if (selectedPersonId === NEW_PERSON_ID && bundle) {
+      const personIds = new Set(bundle.people.map((person) => person.id));
+      const fallback =
+        (bundle.access.claimedPersonId && personIds.has(bundle.access.claimedPersonId)
+          ? bundle.access.claimedPersonId
+          : null) ?? bundle.people[0]?.id ?? null;
+      setSelectedPersonId(fallback);
+    }
+  }
 
   async function refreshTree(nextSession: SessionState) {
     setLoading(true);
@@ -455,6 +422,11 @@ export function TreeWorkspace({
       : `/api/trees/${slug}/people`;
     const method = selectedPerson ? "PATCH" : "POST";
 
+    const body: Record<string, unknown> = { ...payload };
+    if (!selectedPerson && pendingParentId) {
+      body.parentPersonId = pendingParentId;
+    }
+
     await runAction(
       selectedPerson ? "Saving profile" : "Creating profile",
       () =>
@@ -464,12 +436,14 @@ export function TreeWorkspace({
             "content-type": "application/json",
             ...requestHeaders(),
           },
-          body: JSON.stringify(payload),
+          body: JSON.stringify(body),
         }),
       (responsePayload) => {
         const nextPerson = (responsePayload as { person?: { id: string } }).person;
         if (!selectedPerson && nextPerson?.id) {
           setSelectedPersonId(nextPerson.id);
+          setPendingParentId(null);
+          setPersonEditorOpen(false);
         }
       },
     );
@@ -480,11 +454,16 @@ export function TreeWorkspace({
       return;
     }
 
-    await runAction("Archiving profile", () =>
-      fetchWithCred(`/api/trees/${slug}/people/${selectedPerson.id}`, {
-        method: "DELETE",
-        headers: requestHeaders(),
-      }),
+    await runAction(
+      "Archiving profile",
+      () =>
+        fetchWithCred(`/api/trees/${slug}/people/${selectedPerson.id}`, {
+          method: "DELETE",
+          headers: requestHeaders(),
+        }),
+      () => {
+        setPersonEditorOpen(false);
+      },
     );
   }
 
@@ -553,54 +532,6 @@ export function TreeWorkspace({
         body: formData,
       }),
     );
-  }
-
-  async function handleCreateRelationship(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-
-    const endpoint = editingRelationshipId
-      ? `/api/trees/${slug}/relationships/${editingRelationshipId}`
-      : `/api/trees/${slug}/relationships`;
-    const method = editingRelationshipId ? "PATCH" : "POST";
-
-    await runAction(editingRelationshipId ? "Updating relationship" : "Saving relationship", () =>
-      fetchWithCred(endpoint, {
-        method,
-        headers: {
-          "content-type": "application/json",
-          ...requestHeaders(),
-        },
-        body: JSON.stringify(relationshipDraft),
-      }),
-      () => {
-        setEditingRelationshipId(null);
-        setRelationshipDraft(createRelationshipDraft(relationshipScopePersonId));
-      },
-    );
-  }
-
-  async function handleDeleteRelationship(relationshipId: string) {
-    await runAction("Removing relationship", () =>
-      fetchWithCred(`/api/trees/${slug}/relationships/${relationshipId}`, {
-        method: "DELETE",
-        headers: requestHeaders(),
-      }),
-    );
-  }
-
-  function startNewRelationship() {
-    setEditingRelationshipId(null);
-    setRelationshipDraft(createRelationshipDraft(relationshipScopePersonId));
-  }
-
-  function handleEditRelationship(relationship: TreeBundle["relationships"][number]) {
-    setEditingRelationshipId(relationship.id);
-    setRelationshipDraft({
-      fromPersonId: relationship.fromPersonId,
-      toPersonId: relationship.toPersonId,
-      type: relationship.type,
-      note: relationship.note ?? "",
-    });
   }
 
   async function handleModeration(relationshipId: string, decision: "approve" | "reject") {
@@ -756,11 +687,6 @@ export function TreeWorkspace({
     }
   }
 
-  function personNameForId(personId: string) {
-    const person = bundle?.people.find((candidate) => candidate.id === personId);
-    return formatPersonName(person ?? { firstName: "Unknown" });
-  }
-
   if (loading && !bundle) {
     return (
       <div className="mx-auto flex min-h-[70vh] max-w-6xl items-center justify-center px-4">
@@ -882,7 +808,9 @@ export function TreeWorkspace({
                       variant="outline"
                       className="gap-2"
                       onClick={() => {
+                        setPendingParentId(null);
                         setSelectedPersonId(NEW_PERSON_ID);
+                        setPersonEditorOpen(true);
                         setClaimResult(null);
                       }}
                       disabled={!canCreatePeople}
@@ -996,11 +924,10 @@ export function TreeWorkspace({
               </div>
         </Card>
 
-        <div className="grid gap-6 xl:grid-cols-[minmax(0,1.75fr)_420px]">
-          <div className="space-y-6">
+        <div className="space-y-6">
             <Card className="space-y-4">
               <div className="flex flex-wrap items-end justify-between gap-2">
-                <h2 className="text-lg font-semibold text-[var(--ink-strong)]">Bracket</h2>
+                <h2 className="text-lg font-semibold text-[var(--ink-strong)]">Family tree</h2>
                 <p className="text-sm text-[var(--ink-muted)]">
                   {viewNarrowed ? (
                     <>
@@ -1067,213 +994,19 @@ export function TreeWorkspace({
                 onSelectPerson={(personId) => {
                   setSelectedPersonId(personId);
                 }}
+                onEditPerson={(personId) => {
+                  setPendingParentId(null);
+                  setSelectedPersonId(personId);
+                  setPersonEditorOpen(true);
+                }}
+                onAddPerson={({ parentPersonId }) => {
+                  setPendingParentId(parentPersonId ?? null);
+                  setSelectedPersonId(NEW_PERSON_ID);
+                  setPersonEditorOpen(true);
+                  setClaimResult(null);
+                }}
               />
             </Card>
-
-            <div className="grid gap-6 xl:grid-cols-2">
-              <Card className="space-y-4">
-                <h3 className="text-lg font-semibold text-[var(--ink-strong)]">Relationships</h3>
-                <div className="flex flex-wrap items-center gap-2">
-                  {relationshipScopePersonId ? (
-                    <Badge className="bg-[color:rgba(42,74,47,0.08)] text-[var(--brand-forest)]">
-                      Focused on {personNameForId(relationshipScopePersonId)}
-                    </Badge>
-                  ) : null}
-                  {editingRelationshipId ? (
-                    <Badge className="bg-[color:rgba(227,182,97,0.16)] text-[#8D642A]">
-                      Editing an existing relationship
-                    </Badge>
-                  ) : (
-                    <Badge className="bg-[color:rgba(42,74,47,0.08)] text-[var(--brand-forest)]">
-                      Add a new connection
-                    </Badge>
-                  )}
-                  {relationshipScopePersonId &&
-                  relationshipDraft.fromPersonId !== relationshipScopePersonId ? (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      className="px-3 py-2 text-xs"
-                      onClick={() =>
-                        setRelationshipDraft((current) => ({
-                          ...current,
-                          fromPersonId: relationshipScopePersonId,
-                        }))
-                      }
-                      disabled={!canCreatePeople}
-                    >
-                      Use selected person as source
-                    </Button>
-                  ) : null}
-                </div>
-                <form className="space-y-3" onSubmit={handleCreateRelationship}>
-                  <select
-                    value={relationshipDraft.fromPersonId}
-                    onChange={(event) =>
-                      setRelationshipDraft((current) => ({
-                        ...current,
-                        fromPersonId: event.target.value,
-                      }))
-                    }
-                    className={fieldClassName}
-                    disabled={!canCreatePeople}
-                  >
-                    <option value="">From person</option>
-                    {bundle.people.map((person) => (
-                      <option key={person.id} value={person.id}>
-                        {formatPersonName(person)}
-                      </option>
-                    ))}
-                  </select>
-                  <select
-                    value={relationshipDraft.type}
-                    onChange={(event) =>
-                      setRelationshipDraft((current) => ({
-                        ...current,
-                        type: event.target.value,
-                      }))
-                    }
-                    className={fieldClassName}
-                    disabled={!canCreatePeople}
-                  >
-                    {RELATIONSHIP_OPTIONS.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                  <select
-                    value={relationshipDraft.toPersonId}
-                    onChange={(event) =>
-                      setRelationshipDraft((current) => ({
-                        ...current,
-                        toPersonId: event.target.value,
-                      }))
-                    }
-                    className={fieldClassName}
-                    disabled={!canCreatePeople}
-                  >
-                    <option value="">To person</option>
-                    {bundle.people.map((person) => (
-                      <option key={person.id} value={person.id}>
-                        {formatPersonName(person)}
-                      </option>
-                    ))}
-                  </select>
-                  <Input
-                    value={relationshipDraft.note}
-                    onChange={(event) =>
-                      setRelationshipDraft((current) => ({
-                        ...current,
-                        note: event.target.value,
-                      }))
-                    }
-                    disabled={!canCreatePeople}
-                    placeholder="Note"
-                  />
-                  <div className="flex flex-wrap gap-3">
-                    <Button type="submit" className="flex-1" disabled={!canCreatePeople}>
-                      {editingRelationshipId ? "Update relationship" : "Save relationship"}
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={startNewRelationship}
-                      disabled={!canCreatePeople}
-                    >
-                      {editingRelationshipId ? "Cancel edit" : "New relationship"}
-                    </Button>
-                  </div>
-                </form>
-
-                <div className="space-y-3 border-t border-[color:var(--border-soft)] pt-4">
-                  <div className="flex items-center justify-between gap-3">
-                    <h4 className="text-sm font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">
-                      Connections
-                    </h4>
-                    <Badge className="bg-[color:rgba(227,182,97,0.16)] text-[#8D642A]">
-                      {visibleRelationships.length}
-                    </Badge>
-                  </div>
-
-                  <div className="max-h-[360px] space-y-3 overflow-y-auto pr-1">
-                    {visibleRelationships.length === 0 ? (
-                      <div className="rounded-lg border border-dashed border-[color:var(--border-soft)] bg-white/60 p-4 text-sm text-[var(--ink-muted)]">
-                        None in this view
-                      </div>
-                    ) : (
-                      visibleRelationships.map((relationship) => (
-                        <div
-                          key={relationship.id}
-                          className={`rounded-lg border p-4 transition ${
-                            editingRelationshipId === relationship.id
-                              ? "border-[color:var(--brand-amber)] bg-[color:rgba(255,247,231,0.9)]"
-                              : "border-[color:var(--border-soft)] bg-white/72"
-                          }`}
-                        >
-                          <div className="flex flex-col gap-3">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <Badge className="bg-[color:rgba(42,74,47,0.08)] text-[var(--brand-forest)]">
-                                {relationshipTypeLabel(relationship.type)}
-                              </Badge>
-                              <p className="text-sm font-semibold text-[var(--ink-strong)]">
-                                {personNameForId(relationship.fromPersonId)}{" "}
-                                <span className="text-[var(--ink-muted)]">to</span>{" "}
-                                {personNameForId(relationship.toPersonId)}
-                              </p>
-                            </div>
-
-                            {relationship.note ? (
-                              <p className="text-sm text-[var(--ink-soft)]">{relationship.note}</p>
-                            ) : null}
-
-                            <div className="flex flex-wrap gap-2">
-                              {canManageExistingRelationships ? (
-                                <>
-                                  <Button
-                                    type="button"
-                                    variant="outline"
-                                    className="gap-2"
-                                    onClick={() => handleEditRelationship(relationship)}
-                                  >
-                                    <PencilLine className="size-4" />
-                                    Edit
-                                  </Button>
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    className="gap-2 text-[#9A4136] hover:bg-[rgba(154,65,54,0.08)] hover:text-[#9A4136]"
-                                    onClick={() => handleDeleteRelationship(relationship.id)}
-                                  >
-                                    <Trash2 className="size-4" />
-                                    Remove
-                                  </Button>
-                                </>
-                              ) : (
-                                <div className="rounded-full bg-[color:rgba(42,74,47,0.06)] px-3 py-2 text-xs font-medium text-[var(--ink-muted)]">
-                                  {bundle.access.role === "CONTRIBUTOR" ? "Pending approval" : "View only"}
-                                </div>
-                              )}
-
-                              {editingRelationshipId === relationship.id ? (
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  className="gap-2"
-                                  onClick={startNewRelationship}
-                                >
-                                  <X className="size-4" />
-                                  Stop editing
-                                </Button>
-                              ) : null}
-                            </div>
-                          </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </div>
-              </Card>
 
               {bundle.links ? (
                 <ShareLinksCard links={bundle.links} />
@@ -1296,7 +1029,9 @@ export function TreeWorkspace({
                           key={person.id}
                           type="button"
                           onClick={() => {
+                            setPendingParentId(null);
                             setSelectedPersonId(person.id);
+                            setPersonEditorOpen(true);
                           }}
                           className={`w-full rounded-lg border px-4 py-3 text-left transition ${
                             selectedPersonId === person.id
@@ -1420,20 +1155,45 @@ export function TreeWorkspace({
             </div>
           </div>
 
-          <PersonEditorPanel
-            person={selectedPerson}
-            canEdit={Boolean(canEditSelected)}
-            canDelete={Boolean(canDeleteSelected)}
-            canClaim={Boolean(canClaimSelected)}
-            isSaving={Boolean(busyMessage)}
-            claimResult={claimResult}
-            onSave={handleSavePerson}
-            onDelete={handleDeletePerson}
-            onClaim={handleClaim}
-            onUpload={handleUploadMedia}
+      {personEditorOpen && bundle ? (
+        <div className="fixed inset-0 z-40 flex items-start justify-center overflow-y-auto bg-black/45 px-4 py-8 md:py-12">
+          <button
+            type="button"
+            aria-label="Close profile editor"
+            className="fixed inset-0 cursor-default bg-transparent"
+            onClick={closePersonEditor}
           />
+          <Card className="relative z-10 w-full max-w-2xl border-[color:var(--border-soft)] p-0 shadow-xl">
+            <div className="flex items-center justify-between gap-3 border-b border-[color:var(--border-soft)] px-5 py-4">
+              <h2 className="text-lg font-semibold text-[var(--ink-strong)]">
+                {selectedPersonId === NEW_PERSON_ID
+                  ? pendingParentId
+                    ? "Add someone below"
+                    : "Add someone"
+                  : formatPersonName(selectedPerson ?? { firstName: "Profile" })}
+              </h2>
+              <Button type="button" variant="ghost" className="gap-2 px-3 py-2 text-sm" onClick={closePersonEditor}>
+                <X className="size-4" />
+                Close
+              </Button>
+            </div>
+            <div className="max-h-[min(85vh,880px)] overflow-y-auto px-2 pb-4 pt-2 md:px-4">
+              <PersonEditorPanel
+                person={selectedPerson}
+                canEdit={canEditInModal}
+                canDelete={Boolean(canDeleteSelected)}
+                canClaim={Boolean(canClaimSelected)}
+                isSaving={Boolean(busyMessage)}
+                claimResult={claimResult}
+                onSave={handleSavePerson}
+                onDelete={handleDeletePerson}
+                onClaim={handleClaim}
+                onUpload={handleUploadMedia}
+              />
+            </div>
+          </Card>
         </div>
-      </div>
+      ) : null}
 
       {nameGateOpen && bundle?.myEditor?.needsNamePrompt ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 px-4 py-8">

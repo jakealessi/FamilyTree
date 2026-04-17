@@ -61,6 +61,8 @@ export const personPayloadSchema = z.object({
   layoutX: z.number().nullable().optional(),
   layoutY: z.number().nullable().optional(),
   isPrivate: z.boolean().optional().default(true),
+  /** When creating a person, links them under this parent (structural PARENT edge). */
+  parentPersonId: z.string().trim().min(1).optional().nullable(),
 });
 
 export const relationshipPayloadSchema = z.object({

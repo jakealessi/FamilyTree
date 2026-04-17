@@ -10,6 +10,7 @@ import {
   needsStructuralModeration,
 } from "@/lib/server/permissions";
 import { jsonError, parseJson, resolveTreeAccessFromRequest } from "@/lib/server/request";
+import { duplicateRelationshipFilters } from "@/lib/server/relationship-helpers";
 import {
   relationshipStatusForSubmission,
   relationshipSummary,
@@ -18,42 +19,6 @@ import {
 type RouteContext = {
   params: Promise<{ slug: string }>;
 };
-
-function duplicateRelationshipFilters(
-  fromPersonId: string,
-  toPersonId: string,
-  type: string,
-) {
-  const filters: Array<Record<string, string>> = [
-    { fromPersonId, toPersonId, type },
-  ];
-
-  if (type === "SPOUSE" || type === "SIBLING") {
-    filters.push({
-      fromPersonId: toPersonId,
-      toPersonId: fromPersonId,
-      type,
-    });
-  }
-
-  if (type === "PARENT") {
-    filters.push({
-      fromPersonId: toPersonId,
-      toPersonId: fromPersonId,
-      type: "CHILD",
-    });
-  }
-
-  if (type === "CHILD") {
-    filters.push({
-      fromPersonId: toPersonId,
-      toPersonId: fromPersonId,
-      type: "PARENT",
-    });
-  }
-
-  return filters;
-}
 
 export async function POST(request: Request, context: RouteContext) {
   const { slug } = await context.params;

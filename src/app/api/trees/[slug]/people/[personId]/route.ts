@@ -108,7 +108,8 @@ export async function PATCH(request: Request, context: RouteContext) {
   }
 
   const before = serializePersonSnapshot(existing);
-  const nextData = personDataFromInput(parsed.data);
+  const { parentPersonId: _parentIgnored, ...personInput } = parsed.data;
+  const nextData = personDataFromInput(personInput);
 
   const person = await prisma.$transaction(async (tx) => {
     const updated = await tx.person.update({
