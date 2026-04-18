@@ -22,6 +22,7 @@ export type TreeBundle = {
     linkedToUser: boolean;
   };
   links?: {
+    owner?: string | null;
     stable: string;
     edit: string;
     viewer: string | null;

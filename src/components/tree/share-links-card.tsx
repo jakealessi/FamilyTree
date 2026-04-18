@@ -3,11 +3,13 @@
 import { useEffect, useRef, useState } from "react";
 import { Check, Link2, Users, Eye } from "lucide-react";
 
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { copyTextToClipboard } from "@/lib/client/clipboard";
 
 type ShareLinks = {
+  owner?: string | null;
   stable: string;
   edit: string;
   viewer: string | null;
@@ -18,11 +20,43 @@ export function ShareLinksCard({ links }: { links: ShareLinks }) {
   const [copyError, setCopyError] = useState<string | null>(null);
   const resetCopyTimeoutRef = useRef<number | null>(null);
   const items = [
-    { label: "This page", value: links.stable, icon: Link2 },
-    { label: "Edit link", value: links.edit, icon: Users },
-    links.viewer ? { label: "View only", value: links.viewer, icon: Eye } : null,
+    links.owner
+      ? {
+          label: "Owner link",
+          badge: "Keep private",
+          description:
+            "Full-control recovery link for the tree owner. Save this somewhere safe and do not share it broadly.",
+          value: links.owner,
+          icon: Link2,
+        }
+      : null,
+    {
+      label: "This page",
+      badge: "Stable",
+      description: "Stable link for anyone who already has access to this tree.",
+      value: links.stable,
+      icon: Link2,
+    },
+    {
+      label: "Edit link",
+      badge: "Best for helpers",
+      description: "Send this to relatives who should be allowed to add and edit people.",
+      value: links.edit,
+      icon: Users,
+    },
+    links.viewer
+      ? {
+          label: "View only",
+          badge: "Read only",
+          description: "Read-only access for relatives who should not make changes.",
+          value: links.viewer,
+          icon: Eye,
+        }
+      : null,
   ].filter(Boolean) as Array<{
     label: string;
+    badge: string;
+    description: string;
     value: string;
     icon: typeof Link2;
   }>;
@@ -59,7 +93,17 @@ export function ShareLinksCard({ links }: { links: ShareLinks }) {
           {copiedLabel} copied to clipboard
         </p>
       ) : null}
-      <h3 className="text-base font-semibold text-[var(--ink-strong)]">Links</h3>
+      <div className="space-y-1">
+        <h3 className="text-base font-semibold text-[var(--ink-strong)]">Links</h3>
+        <p className="text-sm text-[var(--ink-muted)]">
+          Copy the right link for each relative so access stays simple and private. Keep the owner
+          link for yourself.
+        </p>
+      </div>
+      <div className="rounded-2xl border border-[color:rgba(227,182,97,0.45)] bg-[color:rgba(255,248,234,0.8)] p-4 text-sm text-[var(--ink-strong)]">
+        Send the edit or view link to relatives. Keep the owner link private so you always have
+        full control.
+      </div>
 
       <div className="space-y-3">
         {items.map((item) => {
@@ -67,30 +111,38 @@ export function ShareLinksCard({ links }: { links: ShareLinks }) {
           return (
             <div
               key={item.label}
-              className={`rounded-lg border bg-white p-4 transition-colors ${
+              className={`rounded-2xl border bg-white p-4 transition-colors ${
                 copiedLabel === item.label
                   ? "border-[color:var(--brand-forest)] bg-[color:var(--state-info-bg)]"
                   : "border-[color:var(--border-soft)]"
               }`}
             >
-              <div className="mb-2 flex items-center gap-2">
-                <Icon className="size-4 text-[var(--brand-forest)]" aria-hidden />
-                <p className="font-medium text-[var(--ink-strong)]">{item.label}</p>
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <Icon className="size-4 text-[var(--brand-forest)]" aria-hidden />
+                  <p className="font-medium text-[var(--ink-strong)]">{item.label}</p>
+                </div>
+                <Badge className="bg-[color:rgba(42,74,47,0.08)] text-[var(--brand-forest)]">
+                  {item.badge}
+                </Badge>
               </div>
-              <div className="flex gap-2">
+              <p className="mb-3 text-sm leading-6 text-[var(--ink-muted)]">
+                {item.description}
+              </p>
+              <div className="flex flex-col gap-2 sm:flex-row">
                 <input
                   readOnly
                   value={item.value}
                   aria-label={`${item.label} URL`}
-                  className="w-full rounded-lg border border-[color:var(--border-soft)] bg-[color:rgba(0,0,0,0.02)] px-3 py-2 text-xs text-[var(--ink-soft)]"
+                  className="w-full rounded-2xl border border-[color:var(--border-soft)] bg-[color:rgba(0,0,0,0.02)] px-3 py-2.5 font-mono text-[11px] text-[var(--ink-soft)]"
                 />
                 <Button
                   variant="outline"
                   onClick={() => void handleCopy(item.label, item.value)}
                   className={
                     copiedLabel === item.label
-                      ? "border-[color:var(--brand-forest)] text-[var(--brand-forest)]"
-                      : undefined
+                      ? "sm:min-w-28 border-[color:var(--brand-forest)] text-[var(--brand-forest)]"
+                      : "sm:min-w-28"
                   }
                 >
                   {copiedLabel === item.label ? (

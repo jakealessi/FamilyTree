@@ -2,6 +2,7 @@
 
 import { PencilLine, Plus, User } from "lucide-react";
 
+import { Badge } from "@/components/ui/badge";
 import {
   structuralChildren,
   structuralParentId,
@@ -49,12 +50,14 @@ function AddLeaf({
       type="button"
       onClick={onClick}
       aria-label={label}
-      className={`flex min-h-[52px] flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-[color:var(--border-soft)] bg-[color:rgba(255,255,255,0.35)] px-3 py-2 text-[var(--ink-muted)] transition hover:border-[color:rgba(42,74,47,0.35)] hover:bg-[color:rgba(42,74,47,0.06)] hover:text-[var(--brand-forest)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--focus-ring)] ${
-        narrow ? "min-w-[100px] max-w-[120px]" : "min-w-[140px] max-w-[200px]"
+      className={`flex min-h-[72px] flex-col items-center justify-center gap-1.5 rounded-[22px] border border-dashed border-[color:var(--border-soft)] bg-[color:rgba(255,255,255,0.62)] px-4 py-3 text-[var(--ink-muted)] transition hover:border-[color:rgba(42,74,47,0.35)] hover:bg-[color:rgba(42,74,47,0.06)] hover:text-[var(--brand-forest)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--focus-ring)] ${
+        narrow ? "min-w-[124px] max-w-[142px]" : "min-w-[170px] max-w-[220px]"
       }`}
     >
-      <Plus className="size-4 shrink-0" aria-hidden />
-      <span className="text-center text-[11px] font-semibold uppercase tracking-[0.1em]">
+      <div className="flex size-8 items-center justify-center rounded-full bg-[color:rgba(42,74,47,0.08)] text-[var(--brand-forest)]">
+        <Plus className="size-4 shrink-0" aria-hidden />
+      </div>
+      <span className="text-center text-sm font-semibold leading-5">
         {caption ?? "Add"}
       </span>
     </button>
@@ -71,6 +74,8 @@ type FamilyBracketProps = {
   onAddPerson: (opts: {
     parentPersonId?: string | null;
     childPersonId?: string | null;
+    siblingPersonId?: string | null;
+    peerPersonId?: string | null;
   }) => void;
 };
 
@@ -90,10 +95,10 @@ function PersonCard({
   const status = lifeStatusDot(person);
   return (
     <div
-      className={`relative z-[1] min-w-[160px] max-w-[220px] flex-1 rounded-xl border px-3 py-3 transition ${
+      className={`relative z-[1] min-w-[188px] max-w-[244px] flex-1 rounded-[22px] border px-4 py-4 transition ${
         selected
-          ? "border-[color:var(--brand-forest)] bg-[color:rgba(42,74,47,0.08)] shadow-sm ring-1 ring-[color:rgba(42,74,47,0.2)]"
-          : "border-[color:var(--border-soft)] bg-white"
+          ? "border-[color:rgba(42,74,47,0.32)] bg-[color:rgba(42,74,47,0.08)] shadow-[0_14px_34px_rgba(42,74,47,0.12)] ring-1 ring-[color:rgba(42,74,47,0.12)]"
+          : "border-[color:var(--border-soft)] bg-[color:rgba(255,255,255,0.94)] shadow-[0_10px_24px_rgba(47,36,28,0.04)]"
       }`}
     >
       <button
@@ -103,7 +108,15 @@ function PersonCard({
         onClick={onSelect}
         className="w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--focus-ring)] focus-visible:ring-offset-2"
       >
-        <div className="flex items-start gap-2 pr-7">
+        <div className="mb-3 flex flex-wrap items-center gap-2 pr-7">
+          {selected ? (
+            <Badge className="bg-[color:rgba(42,74,47,0.12)] text-[var(--brand-forest)]">
+              Selected
+            </Badge>
+          ) : null}
+          {person.claimedBy ? <Badge>Claimed</Badge> : null}
+        </div>
+        <div className="flex items-start gap-3 pr-7">
           <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-[color:rgba(42,74,47,0.08)] text-[var(--brand-forest)]">
             <User className="size-4" />
           </div>
@@ -120,11 +133,16 @@ function PersonCard({
             <p className="mt-0.5 text-xs text-[var(--ink-muted)]">
               {formatDateRange(person.birthDate, person.deathDate) || "Dates unknown"}
             </p>
-            {person.currentCity ? (
-              <p className="mt-1 truncate text-xs text-[var(--ink-soft)]">{person.currentCity}</p>
+            {person.currentCity || person.occupation ? (
+              <p className="mt-1 truncate text-xs text-[var(--ink-soft)]">
+                {person.currentCity || person.occupation}
+              </p>
             ) : null}
           </div>
         </div>
+        <p className="mt-3 text-xs leading-5 text-[var(--ink-muted)]">
+          Tap this card to work from this person.
+        </p>
       </button>
       {canCreatePeople ? (
         <button
@@ -165,6 +183,8 @@ function PersonSubtree({
   onAddPerson: (opts: {
     parentPersonId?: string | null;
     childPersonId?: string | null;
+    siblingPersonId?: string | null;
+    peerPersonId?: string | null;
   }) => void;
 }) {
   if (visited.has(personId)) {
@@ -188,22 +208,12 @@ function PersonSubtree({
     );
 
   const selected = person.id === selectedPersonId;
-  const hasStructuralParent = Boolean(structuralParentId(bundle, person.id));
+  const parentId = structuralParentId(bundle, person.id);
+  const hasStructuralParent = Boolean(parentId);
   const multiChild = childIds.length > 1;
 
   return (
     <div className="flex flex-col items-center gap-2">
-      {canCreatePeople && !hasStructuralParent ? (
-        <AddLeaf
-          label={`Add someone above ${formatPersonName(person)}`}
-          caption="Above"
-          narrow
-          onClick={() =>
-            onAddPerson({ parentPersonId: null, childPersonId: person.id })
-          }
-        />
-      ) : null}
-
       <PersonCard
         person={person}
         selected={selected}
@@ -213,12 +223,41 @@ function PersonSubtree({
       />
 
       {canCreatePeople ? (
-        <AddLeaf
-          label={`Add a child under ${formatPersonName(person)}`}
-          caption="Below"
-          narrow
-          onClick={() => onAddPerson({ parentPersonId: person.id, childPersonId: null })}
-        />
+        <div className="flex flex-wrap items-center justify-center gap-2">
+          {!hasStructuralParent ? (
+            <AddLeaf
+              label={`Add a parent for ${formatPersonName(person)}`}
+              caption="Add parent"
+              narrow
+              onClick={() => onAddPerson({ childPersonId: person.id })}
+            />
+          ) : null}
+          {parentId ? (
+            <AddLeaf
+              label={`Add a sibling for ${formatPersonName(person)}`}
+              caption="Add sibling"
+              narrow
+              onClick={() =>
+                onAddPerson({
+                  parentPersonId: parentId,
+                  siblingPersonId: person.id,
+                })
+              }
+            />
+          ) : (
+            <AddLeaf
+              label={`Add another top-level person near ${formatPersonName(person)}`}
+              caption="New branch"
+              onClick={() => onAddPerson({ peerPersonId: person.id })}
+            />
+          )}
+          <AddLeaf
+            label={`Add a child for ${formatPersonName(person)}`}
+            caption="Add child"
+            narrow
+            onClick={() => onAddPerson({ parentPersonId: person.id })}
+          />
+        </div>
       ) : null}
 
       {childIds.length > 0 ? (
@@ -293,12 +332,21 @@ export function FamilyBracket({
   if (bundle.people.length === 0) {
     return (
       <div className="flex min-h-[min(60vh,520px)] flex-col items-center justify-center rounded-2xl border border-dashed border-[color:var(--border-soft)] bg-[color:rgba(255,255,255,0.5)] px-6 py-16">
-        <p className="text-sm font-medium text-[var(--ink-muted)]">
-          {canCreatePeople ? "Start your tree" : "No profiles yet"}
+        <p className="text-base font-semibold text-[var(--ink-strong)]">
+          {canCreatePeople ? "Start your tree with one person" : "No profiles yet"}
+        </p>
+        <p className="mt-2 max-w-md text-center text-sm leading-6 text-[var(--ink-muted)]">
+          {canCreatePeople
+            ? "Press the button below and add the first family member. You only need a first name to begin."
+            : "There are no visible profiles in this tree yet."}
         </p>
         {canCreatePeople ? (
           <div className="mt-6">
-            <AddLeaf label="Add the first person" onClick={() => onAddPerson({})} />
+            <AddLeaf
+              label="Add the first person"
+              caption="Add first person"
+              onClick={() => onAddPerson({})}
+            />
           </div>
         ) : null}
       </div>
@@ -326,14 +374,27 @@ export function FamilyBracket({
   if (roots.length === 0 && visiblePersonIds.length === 0) {
     return (
       <div className="rounded-2xl border border-dashed border-[color:var(--border-soft)] bg-[color:rgba(255,255,255,0.5)] px-6 py-10 text-center text-sm text-[var(--ink-muted)]">
-        No matches
+        No matches. Clear your search or filters to bring people back into view.
       </div>
     );
   }
 
   return (
-    <div className="overflow-x-auto rounded-2xl border border-[color:var(--border-soft)] bg-[color:rgba(255,255,255,0.45)] p-4 md:p-6">
-      <div className="flex min-h-[min(50vh,560px)] min-w-[min(100%,720px)] flex-col items-center justify-start gap-2">
+    <div className="space-y-4 overflow-x-auto rounded-[28px] border border-[color:var(--border-soft)] bg-[color:rgba(255,255,255,0.46)] p-4 md:p-6">
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[color:var(--border-soft)] bg-white/72 px-4 py-3">
+        <div>
+          <p className="text-sm font-semibold text-[var(--ink-strong)]">Tree view</p>
+          <p className="text-sm leading-6 text-[var(--ink-muted)]">
+            Tap a person card to choose who you are working from. Then use the dashed add cards
+            around that person to place relatives in the right spot.
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Badge>Tap card = choose person</Badge>
+          <Badge>Dashed card = add relative</Badge>
+        </div>
+      </div>
+      <div className="flex min-h-[min(50vh,560px)] min-w-[min(100%,760px)] flex-col items-center justify-start gap-2">
         <div className="flex flex-row flex-wrap items-start justify-center gap-x-10 gap-y-12 md:gap-x-14">
           {roots.map((rootId) => (
             <PersonSubtree
@@ -352,11 +413,12 @@ export function FamilyBracket({
           {canCreatePeople ? (
             <div className="flex flex-col items-center gap-2 pt-1">
               <AddLeaf
-                label="Add another root or branch"
+                label="Add another top-level branch"
+                caption="New branch"
                 onClick={() => onAddPerson({ parentPersonId: null })}
               />
-              <span className="max-w-[12rem] text-center text-[10px] text-[var(--ink-muted)]">
-                Same row as others with no parent link yet
+              <span className="max-w-[13rem] text-center text-xs leading-5 text-[var(--ink-muted)]">
+                Starts another branch at the top of the tree
               </span>
             </div>
           ) : null}

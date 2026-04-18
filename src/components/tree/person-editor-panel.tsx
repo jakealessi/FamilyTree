@@ -151,15 +151,6 @@ function PersonEditorPanelContent({
 }: PersonEditorPanelProps) {
   const [form, setForm] = useState(() => formStateFromPerson(person));
   const [formDirty, setFormDirty] = useState(false);
-  const personSyncKey = useMemo(
-    () => (person ? JSON.stringify(formStateFromPerson(person)) : ""),
-    [person],
-  );
-  const [lastServerSyncKey, setLastServerSyncKey] = useState(personSyncKey);
-  if (personSyncKey !== lastServerSyncKey && !formDirty) {
-    setLastServerSyncKey(personSyncKey);
-    setForm(formStateFromPerson(person));
-  }
   const [activeTab, setActiveTab] = useState<PanelTab>(person ? "overview" : "edit");
   const [uploadType, setUploadType] = useState<"PROFILE" | "GALLERY">("PROFILE");
   const [uploadCaption, setUploadCaption] = useState("");
@@ -278,26 +269,57 @@ function PersonEditorPanelContent({
     }
 
     return (
-      <div className="rounded-lg border border-[color:var(--border-soft)] bg-[color:rgba(0,0,0,0.03)] p-4 text-sm text-[var(--ink-strong)]">
-        <p className="font-semibold">Personal edit link created for {formatPersonName(person)}.</p>
-        <p className="mt-2 text-[var(--ink-soft)]">Recovery code: {claimResult.recoveryCode}</p>
-        <div className="mt-3 flex gap-2">
-          <input
-            readOnly
-            value={claimResult.personalLink}
-            className="w-full rounded-lg border border-[color:var(--border-soft)] bg-white/85 px-3 py-2 text-xs"
-          />
-          <Button variant="outline" onClick={handleCopyClaimLink}>
-            {claimCopyState === "copied"
-              ? "Copied"
-              : claimCopyState === "failed"
-                ? "Copy manually"
-                : "Copy"}
-          </Button>
+      <div className="rounded-lg border border-[color:rgba(42,74,47,0.18)] bg-[color:rgba(42,74,47,0.05)] p-4 text-sm text-[var(--ink-strong)]">
+        <div className="flex items-start gap-3">
+          <div className="mt-0.5 flex size-8 items-center justify-center rounded-full bg-[color:rgba(42,74,47,0.1)] text-[var(--brand-forest)]">
+            <Crown className="size-4" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="font-semibold">This profile is now linked to you.</p>
+            <p className="mt-1 leading-6 text-[var(--ink-soft)]">
+              Keep these details somewhere safe. The personal edit link lets only you open this
+              profile for editing, and the recovery code helps if you switch devices later.
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-4 rounded-lg border border-[color:var(--border-soft)] bg-white/80 px-4 py-3">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">
+            Recovery code
+          </p>
+          <p className="mt-2 font-mono text-sm text-[var(--ink-strong)]">
+            {claimResult.recoveryCode}
+          </p>
+        </div>
+
+        <div className="mt-4">
+          <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">
+            Personal edit link
+          </label>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <input
+              readOnly
+              value={claimResult.personalLink}
+              aria-label={`Personal edit link for ${formatPersonName(person)}`}
+              className="w-full rounded-lg border border-[color:var(--border-soft)] bg-white/85 px-3 py-2 text-xs"
+            />
+            <Button variant="outline" onClick={handleCopyClaimLink} className="sm:min-w-28">
+              {claimCopyState === "copied"
+                ? "Copied"
+                : claimCopyState === "failed"
+                  ? "Copy manually"
+                  : "Copy link"}
+            </Button>
+          </div>
         </div>
         {claimCopyState === "failed" ? (
-          <p className="mt-2 text-xs text-[var(--ink-muted)]">Copy manually</p>
+          <p className="mt-2 text-xs text-[var(--ink-muted)]">
+            Your browser did not copy it automatically, so you can copy it manually from the box.
+          </p>
         ) : null}
+        <p className="mt-3 text-xs leading-5 text-[var(--ink-muted)]">
+          Share the family edit link with relatives. Keep this personal link just for yourself.
+        </p>
       </div>
     );
   }
@@ -306,7 +328,11 @@ function PersonEditorPanelContent({
     if (!person) {
       return (
         <div className="rounded-lg border border-dashed border-[color:var(--border-soft)] bg-[color:rgba(0,0,0,0.02)] p-6 text-sm text-[var(--ink-muted)]">
-          Select someone
+          <p className="font-semibold text-[var(--ink-strong)]">Choose a person to see details</p>
+          <p className="mt-2 leading-6">
+            Tap a person in the tree or the people list. If you want to add someone new, use
+            the add button first.
+          </p>
         </div>
       );
     }
@@ -508,6 +534,21 @@ function PersonEditorPanelContent({
   }
 
   function renderEditForm() {
+    const detailsFilled = Boolean(
+      form.middleName ||
+        form.maidenName ||
+        form.gender !== "UNSPECIFIED" ||
+        form.birthDate ||
+        form.deathDate ||
+        form.birthplace ||
+        form.occupation ||
+        form.education ||
+        form.hobbies,
+    );
+    const storyFilled = Boolean(
+      form.bio || form.favoriteQuote || form.lifeEventsText || form.notesText,
+    );
+
     return (
       <form className="space-y-5" onSubmit={handleSubmit}>
         {person && !canEdit ? (
@@ -520,183 +561,301 @@ function PersonEditorPanelContent({
         ) : null}
         {canEdit && formDirty ? (
           <p className="text-xs font-medium text-[#8D642A]" role="status">
-            Unsaved
+            You have unsaved changes
           </p>
         ) : null}
-        <div className="grid gap-3 sm:grid-cols-2">
-          <div className="sm:col-span-2">
-            <label className="mb-2 block text-sm font-medium text-[var(--ink-strong)]">First name</label>
-            <Input
-              required
-              value={form.firstName}
-              disabled={!canEdit}
-              onChange={(event) => updateField("firstName", event.target.value)}
-            />
+        <div className="rounded-xl border border-[color:var(--border-soft)] bg-[color:rgba(255,248,234,0.72)] p-4">
+          <p className="font-semibold text-[var(--ink-strong)]">
+            {person ? "Edit this profile one step at a time." : "Start with the basics."}
+          </p>
+          <p className="mt-1 text-sm leading-6 text-[var(--ink-muted)]">
+            Only the first name is required. Everything else is optional and can be added later.
+          </p>
+          <div className="mt-3 grid gap-2 text-xs text-[var(--ink-soft)] sm:grid-cols-3">
+            <div className="rounded-lg border border-[color:var(--border-soft)] bg-white/70 px-3 py-2">
+              1. Add the name you know
+            </div>
+            <div className="rounded-lg border border-[color:var(--border-soft)] bg-white/70 px-3 py-2">
+              2. Save whenever you are ready
+            </div>
+            <div className="rounded-lg border border-[color:var(--border-soft)] bg-white/70 px-3 py-2">
+              3. Come back later for more detail
+            </div>
           </div>
-          <div>
-            <label className="mb-2 block text-sm font-medium text-[var(--ink-strong)]">Middle name</label>
-            <Input
-              value={form.middleName}
-              disabled={!canEdit}
-              onChange={(event) => updateField("middleName", event.target.value)}
-            />
-          </div>
-          <div>
-            <label className="mb-2 block text-sm font-medium text-[var(--ink-strong)]">Last name</label>
-            <Input
-              value={form.lastName}
-              disabled={!canEdit}
-              onChange={(event) => updateField("lastName", event.target.value)}
-            />
-          </div>
-          <div>
-            <label className="mb-2 block text-sm font-medium text-[var(--ink-strong)]">Nickname</label>
-            <Input
-              value={form.nickname}
-              disabled={!canEdit}
-              onChange={(event) => updateField("nickname", event.target.value)}
-            />
-          </div>
-          <div>
-            <label className="mb-2 block text-sm font-medium text-[var(--ink-strong)]">Maiden name</label>
-            <Input
-              value={form.maidenName}
-              disabled={!canEdit}
-              onChange={(event) => updateField("maidenName", event.target.value)}
-            />
-          </div>
-          <div>
-            <label className="mb-2 block text-sm font-medium text-[var(--ink-strong)]">Gender</label>
-            <select
-              value={form.gender}
-              disabled={!canEdit}
-              onChange={(event) => updateField("gender", event.target.value)}
-              className={fieldClassName}
-            >
-              {GENDER_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="mb-2 block text-sm font-medium text-[var(--ink-strong)]">Life status</label>
-            <select
-              value={form.lifeStatus}
-              disabled={!canEdit}
-              onChange={(event) => updateField("lifeStatus", event.target.value)}
-              className={fieldClassName}
-            >
-              {LIFE_STATUS_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="mb-2 block text-sm font-medium text-[var(--ink-strong)]">Birth date</label>
-            <Input
-              type="date"
-              value={form.birthDate}
-              disabled={!canEdit}
-              onChange={(event) => updateField("birthDate", event.target.value)}
-            />
-          </div>
-          <div>
-            <label className="mb-2 block text-sm font-medium text-[var(--ink-strong)]">Death date</label>
-            <Input
-              type="date"
-              value={form.deathDate}
-              disabled={!canEdit}
-              onChange={(event) => updateField("deathDate", event.target.value)}
-            />
-          </div>
-          <div>
-            <label className="mb-2 block text-sm font-medium text-[var(--ink-strong)]">Birthplace</label>
-            <Input
-              value={form.birthplace}
-              disabled={!canEdit}
-              onChange={(event) => updateField("birthplace", event.target.value)}
-            />
-          </div>
-          <div>
-            <label className="mb-2 block text-sm font-medium text-[var(--ink-strong)]">Current city</label>
-            <Input
-              value={form.currentCity}
-              disabled={!canEdit}
-              onChange={(event) => updateField("currentCity", event.target.value)}
-            />
-          </div>
-          <div>
-            <label className="mb-2 block text-sm font-medium text-[var(--ink-strong)]">Occupation</label>
-            <Input
-              value={form.occupation}
-              disabled={!canEdit}
-              onChange={(event) => updateField("occupation", event.target.value)}
-            />
-          </div>
-          <div>
-            <label className="mb-2 block text-sm font-medium text-[var(--ink-strong)]">Education</label>
-            <Input
-              value={form.education}
-              disabled={!canEdit}
-              onChange={(event) => updateField("education", event.target.value)}
-            />
-          </div>
-          <div>
-            <label className="mb-2 block text-sm font-medium text-[var(--ink-strong)]">Hobbies</label>
-            <Input
-              value={form.hobbies}
-              disabled={!canEdit}
-              onChange={(event) => updateField("hobbies", event.target.value)}
-            />
-          </div>
-          <label className="flex items-center gap-3 rounded-lg border border-[color:var(--border-soft)] bg-white/75 px-4 py-3 text-sm text-[var(--ink-strong)]">
-            <input
-              type="checkbox"
-              checked={form.isPrivate}
-              disabled={!canEdit}
-              onChange={(event) => updateField("isPrivate", event.target.checked)}
-              className="size-4 rounded"
-            />
-            Private by default
-          </label>
         </div>
 
-        <div>
-          <label className="mb-2 block text-sm font-medium text-[var(--ink-strong)]">Bio</label>
-          <Textarea
-            value={form.bio}
-            disabled={!canEdit}
-            onChange={(event) => updateField("bio", event.target.value)}
-          />
-        </div>
-        <div>
-          <label className="mb-2 block text-sm font-medium text-[var(--ink-strong)]">Favorite quote</label>
-          <Textarea
-            value={form.favoriteQuote}
-            disabled={!canEdit}
-            onChange={(event) => updateField("favoriteQuote", event.target.value)}
-          />
-        </div>
-        <div>
-          <label className="mb-2 block text-sm font-medium text-[var(--ink-strong)]">Life events, one per line</label>
-          <Textarea
-            value={form.lifeEventsText}
-            disabled={!canEdit}
-            onChange={(event) => updateField("lifeEventsText", event.target.value)}
-          />
-        </div>
-        <div>
-          <label className="mb-2 block text-sm font-medium text-[var(--ink-strong)]">Notes, one per line</label>
-          <Textarea
-            value={form.notesText}
-            disabled={!canEdit}
-            onChange={(event) => updateField("notesText", event.target.value)}
-          />
-        </div>
+        <ProfileSection
+          title="Basic details"
+          description="Add only what you know right now. The rest can wait."
+        >
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="sm:col-span-2">
+              <label className="mb-2 block text-sm font-medium text-[var(--ink-strong)]">
+                First name
+              </label>
+              <Input
+                required
+                value={form.firstName}
+                disabled={!canEdit}
+                placeholder="e.g. Maria"
+                onChange={(event) => updateField("firstName", event.target.value)}
+              />
+              <p className="mt-2 text-xs leading-5 text-[var(--ink-muted)]">
+                This is the only field required to save the profile.
+              </p>
+            </div>
+            <div>
+              <label className="mb-2 block text-sm font-medium text-[var(--ink-strong)]">
+                Last name
+              </label>
+              <Input
+                value={form.lastName}
+                disabled={!canEdit}
+                placeholder="e.g. Alvarez"
+                onChange={(event) => updateField("lastName", event.target.value)}
+              />
+            </div>
+            <div>
+              <label className="mb-2 block text-sm font-medium text-[var(--ink-strong)]">
+                Nickname
+              </label>
+              <Input
+                value={form.nickname}
+                disabled={!canEdit}
+                placeholder="e.g. Aunt May"
+                onChange={(event) => updateField("nickname", event.target.value)}
+              />
+            </div>
+            <div>
+              <label className="mb-2 block text-sm font-medium text-[var(--ink-strong)]">
+                Life status
+              </label>
+              <select
+                value={form.lifeStatus}
+                disabled={!canEdit}
+                onChange={(event) => updateField("lifeStatus", event.target.value)}
+                className={fieldClassName}
+              >
+                {LIFE_STATUS_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="mb-2 block text-sm font-medium text-[var(--ink-strong)]">
+                Current city
+              </label>
+              <Input
+                value={form.currentCity}
+                disabled={!canEdit}
+                placeholder="e.g. Denver"
+                onChange={(event) => updateField("currentCity", event.target.value)}
+              />
+            </div>
+            <label className="sm:col-span-2 flex items-center gap-3 rounded-lg border border-[color:var(--border-soft)] bg-white/75 px-4 py-3 text-sm text-[var(--ink-strong)]">
+              <input
+                type="checkbox"
+                checked={form.isPrivate}
+                disabled={!canEdit}
+                onChange={(event) => updateField("isPrivate", event.target.checked)}
+                className="size-4 rounded"
+              />
+              Keep this profile private by default
+            </label>
+          </div>
+        </ProfileSection>
+
+        <details className="rounded-lg border border-[color:var(--border-soft)] bg-white">
+          <summary className="cursor-pointer list-none px-5 py-4">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-base font-semibold text-[var(--ink-strong)]">
+                  Optional details
+                </p>
+                <p className="text-sm text-[var(--ink-muted)]">
+                  Dates, places, work, school, and identity details.
+                </p>
+              </div>
+              <Badge>{detailsFilled ? "Has details" : "Optional"}</Badge>
+            </div>
+          </summary>
+          <div className="border-t border-[color:var(--border-soft)] px-5 py-4">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <label className="mb-2 block text-sm font-medium text-[var(--ink-strong)]">
+                  Middle name
+                </label>
+                <Input
+                  value={form.middleName}
+                  disabled={!canEdit}
+                  placeholder="e.g. Grace"
+                  onChange={(event) => updateField("middleName", event.target.value)}
+                />
+              </div>
+              <div>
+                <label className="mb-2 block text-sm font-medium text-[var(--ink-strong)]">
+                  Maiden name
+                </label>
+                <Input
+                  value={form.maidenName}
+                  disabled={!canEdit}
+                  placeholder="e.g. Carter"
+                  onChange={(event) => updateField("maidenName", event.target.value)}
+                />
+              </div>
+              <div>
+                <label className="mb-2 block text-sm font-medium text-[var(--ink-strong)]">
+                  Gender
+                </label>
+                <select
+                  value={form.gender}
+                  disabled={!canEdit}
+                  onChange={(event) => updateField("gender", event.target.value)}
+                  className={fieldClassName}
+                >
+                  {GENDER_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="mb-2 block text-sm font-medium text-[var(--ink-strong)]">
+                  Birth date
+                </label>
+                <Input
+                  type="date"
+                  value={form.birthDate}
+                  disabled={!canEdit}
+                  placeholder="Birth date"
+                  onChange={(event) => updateField("birthDate", event.target.value)}
+                />
+              </div>
+              <div>
+                <label className="mb-2 block text-sm font-medium text-[var(--ink-strong)]">
+                  Death date
+                </label>
+                <Input
+                  type="date"
+                  value={form.deathDate}
+                  disabled={!canEdit}
+                  placeholder="Death date"
+                  onChange={(event) => updateField("deathDate", event.target.value)}
+                />
+              </div>
+              <div>
+                <label className="mb-2 block text-sm font-medium text-[var(--ink-strong)]">
+                  Birthplace
+                </label>
+                <Input
+                  value={form.birthplace}
+                  disabled={!canEdit}
+                  placeholder="e.g. Savannah, Georgia"
+                  onChange={(event) => updateField("birthplace", event.target.value)}
+                />
+              </div>
+              <div>
+                <label className="mb-2 block text-sm font-medium text-[var(--ink-strong)]">
+                  Occupation
+                </label>
+                <Input
+                  value={form.occupation}
+                  disabled={!canEdit}
+                  placeholder="e.g. Teacher"
+                  onChange={(event) => updateField("occupation", event.target.value)}
+                />
+              </div>
+              <div>
+                <label className="mb-2 block text-sm font-medium text-[var(--ink-strong)]">
+                  Education
+                </label>
+                <Input
+                  value={form.education}
+                  disabled={!canEdit}
+                  placeholder="e.g. Howard University"
+                  onChange={(event) => updateField("education", event.target.value)}
+                />
+              </div>
+              <div className="sm:col-span-2">
+                <label className="mb-2 block text-sm font-medium text-[var(--ink-strong)]">
+                  Hobbies
+                </label>
+                <Input
+                  value={form.hobbies}
+                  disabled={!canEdit}
+                  placeholder="Gardening, baking, fishing"
+                  onChange={(event) => updateField("hobbies", event.target.value)}
+                />
+              </div>
+            </div>
+          </div>
+        </details>
+
+        <details className="rounded-lg border border-[color:var(--border-soft)] bg-white">
+          <summary className="cursor-pointer list-none px-5 py-4">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-base font-semibold text-[var(--ink-strong)]">
+                  Stories and notes
+                </p>
+                <p className="text-sm text-[var(--ink-muted)]">
+                  Add a short bio, favorite quote, life events, or family notes.
+                </p>
+              </div>
+              <Badge>{storyFilled ? "Has notes" : "Optional"}</Badge>
+            </div>
+          </summary>
+          <div className="space-y-4 border-t border-[color:var(--border-soft)] px-5 py-4">
+            <div>
+              <label className="mb-2 block text-sm font-medium text-[var(--ink-strong)]">
+                Bio
+              </label>
+              <Textarea
+                value={form.bio}
+                disabled={!canEdit}
+                placeholder="A few sentences relatives would recognize right away"
+                onChange={(event) => updateField("bio", event.target.value)}
+              />
+            </div>
+            <div>
+              <label className="mb-2 block text-sm font-medium text-[var(--ink-strong)]">
+                Favorite quote
+              </label>
+              <Textarea
+                value={form.favoriteQuote}
+                disabled={!canEdit}
+                placeholder="A saying they were known for"
+                onChange={(event) => updateField("favoriteQuote", event.target.value)}
+              />
+            </div>
+            <div>
+              <label className="mb-2 block text-sm font-medium text-[var(--ink-strong)]">
+                Life events, one per line
+              </label>
+              <Textarea
+                value={form.lifeEventsText}
+                disabled={!canEdit}
+                placeholder={"Graduated from college\nMoved to Chicago"}
+                onChange={(event) => updateField("lifeEventsText", event.target.value)}
+              />
+            </div>
+            <div>
+              <label className="mb-2 block text-sm font-medium text-[var(--ink-strong)]">
+                Notes, one per line
+              </label>
+              <Textarea
+                value={form.notesText}
+                disabled={!canEdit}
+                placeholder={"Loves gardening\nKeeps the family recipes"}
+                onChange={(event) => updateField("notesText", event.target.value)}
+              />
+            </div>
+          </div>
+        </details>
+
         <div className="flex flex-wrap items-center gap-3">
           {canEdit ? (
             <Button type="submit" disabled={isSaving} className="gap-2">
@@ -714,6 +873,11 @@ function PersonEditorPanelContent({
             </Button>
           ) : null}
         </div>
+        {canEdit ? (
+          <p className="text-xs leading-5 text-[var(--ink-muted)]">
+            You can save now with only a first name and come back later for the rest.
+          </p>
+        ) : null}
       </form>
     );
   }
@@ -725,10 +889,19 @@ function PersonEditorPanelContent({
 
     return (
       <div className="space-y-4 rounded-lg border border-[color:var(--border-soft)] bg-white p-4">
-        <h3 className="text-base font-semibold text-[var(--ink-strong)]">Media</h3>
+        <div className="space-y-1">
+          <h3 className="text-base font-semibold text-[var(--ink-strong)]">Photos</h3>
+          <p className="text-sm text-[var(--ink-muted)]">
+            Add a profile photo or a few gallery images for this person.
+          </p>
+        </div>
 
         {mediaItems.length === 0 ? (
-          <p className="text-sm text-[var(--ink-muted)]">—</p>
+          <div className="rounded-lg border border-dashed border-[color:var(--border-soft)] bg-[color:rgba(0,0,0,0.02)] p-4 text-sm text-[var(--ink-muted)]">
+            {canEdit
+              ? "No photos yet. Paste an image link or choose a file below."
+              : "No photos have been added for this person yet."}
+          </div>
         ) : (
           <div className="grid gap-3 sm:grid-cols-2">
             {mediaItems.map((item) => (
@@ -757,17 +930,17 @@ function PersonEditorPanelContent({
               <Input
                 value={uploadCaption}
                 onChange={(event) => setUploadCaption(event.target.value)}
-                placeholder="Caption"
+                placeholder="Short caption (optional)"
               />
             </div>
             <Input
               value={uploadUrl}
               onChange={(event) => setUploadUrl(event.target.value)}
-              placeholder="Paste an external image URL, or choose a file below"
+              placeholder="Paste an image URL, or choose a file below"
             />
             <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-dashed border-[color:var(--border-soft)] bg-white/75 px-4 py-3 text-sm text-[var(--ink-soft)]">
               <Upload className="size-4" />
-              <span>{uploadFile ? uploadFile.name : "Choose a small image file"}</span>
+              <span>{uploadFile ? uploadFile.name : "Choose an image file"}</span>
               <input
                 ref={uploadFileInputRef}
                 type="file"
@@ -779,7 +952,7 @@ function PersonEditorPanelContent({
             <div className="flex gap-3">
               <Button variant="outline" type="submit" className="gap-2">
                 <Camera className="size-4" />
-                Upload media
+                Add photo
               </Button>
             </div>
           </form>
@@ -789,12 +962,17 @@ function PersonEditorPanelContent({
   }
 
   return (
-    <Card className="h-full space-y-6">
-      <div className="space-y-4">
-        <div>
+    <Card className="h-full space-y-6 bg-[color:rgba(255,255,255,0.84)]">
+      <div className="space-y-4 rounded-2xl border border-[color:var(--border-soft)] bg-[color:rgba(255,255,255,0.62)] p-4">
+        <div className="space-y-2">
           <h2 className="text-xl font-semibold text-[var(--ink-strong)] md:text-2xl">
-            {person ? formatPersonName(person) : "New person"}
+            {person ? formatPersonName(person) : "New family member"}
           </h2>
+          <p className="mt-1 text-sm leading-6 text-[var(--ink-muted)]">
+            {person
+              ? "Choose a section below to read the profile, change details, or add photos."
+              : "Start with the first name, save, and come back later for the rest if you want."}
+          </p>
         </div>
 
         {person ? (
@@ -806,47 +984,47 @@ function PersonEditorPanelContent({
           </div>
         ) : null}
 
-        <div className="flex flex-wrap items-center gap-3">
-          {person ? (
+        {person ? (
+          <div className="flex flex-wrap gap-2 rounded-2xl bg-[color:rgba(42,74,47,0.05)] p-1">
             <Button
               type="button"
-              variant={activeTab === "overview" ? "secondary" : "outline"}
-              className="min-h-9 px-3 py-1.5 text-xs"
+              variant={activeTab === "overview" ? "secondary" : "ghost"}
+              className="min-h-10 flex-1 px-3 py-1.5 text-xs sm:flex-none"
               onClick={() => setActiveTab("overview")}
             >
-              Overview
+              View profile
             </Button>
-          ) : null}
 
-          {person && canEdit ? (
+            {person && canEdit ? (
+              <Button
+                type="button"
+                variant={activeTab === "edit" ? "secondary" : "ghost"}
+                className="relative min-h-10 flex-1 px-3 py-1.5 text-xs sm:flex-none"
+                onClick={() => setActiveTab("edit")}
+              >
+                Edit details
+                {formDirty && activeTab !== "edit" ? (
+                  <span
+                    className="absolute -right-0.5 -top-0.5 flex size-2 rounded-full border border-white bg-[var(--brand-amber)]"
+                    title="Unsaved edits"
+                    aria-hidden
+                  />
+                ) : null}
+              </Button>
+            ) : null}
+
             <Button
               type="button"
-              variant={activeTab === "edit" ? "secondary" : "outline"}
-              className="relative min-h-9 px-3 py-1.5 text-xs"
-              onClick={() => setActiveTab("edit")}
-            >
-              Edit
-              {formDirty && activeTab !== "edit" ? (
-                <span
-                  className="absolute -right-0.5 -top-0.5 flex size-2 rounded-full border border-white bg-[var(--brand-amber)]"
-                  title="Unsaved edits"
-                  aria-hidden
-                />
-              ) : null}
-            </Button>
-          ) : null}
-
-          {person ? (
-            <Button
-              type="button"
-              variant={activeTab === "media" ? "secondary" : "outline"}
-              className="min-h-9 px-3 py-1.5 text-xs"
+              variant={activeTab === "media" ? "secondary" : "ghost"}
+              className="min-h-10 flex-1 px-3 py-1.5 text-xs sm:flex-none"
               onClick={() => setActiveTab("media")}
             >
-              Media
+              Photos
             </Button>
-          ) : null}
+          </div>
+        ) : null}
 
+        <div className="flex flex-wrap items-center gap-3">
           {canClaim && person ? (
             <Button type="button" variant="secondary" onClick={onClaim} className="gap-2">
               <Crown className="size-4" />
@@ -860,6 +1038,23 @@ function PersonEditorPanelContent({
             </Button>
           ) : null}
         </div>
+
+        {person ? (
+          <p className="text-xs leading-5 text-[var(--ink-muted)]">
+            {activeTab === "overview"
+              ? "Overview shows the main facts and memories for this person."
+              : activeTab === "edit"
+                ? "Edit details here. You only need the basics to save."
+                : "Photos can be added from a file or by pasting an image link."}
+          </p>
+        ) : null}
+
+        {canClaim && person ? (
+          <p className="text-xs leading-5 text-[var(--ink-muted)]">
+            Use “Claim this profile” only if this person is you. It creates a personal link that
+            edits only your own profile.
+          </p>
+        ) : null}
       </div>
 
       {renderClaimResult()}
@@ -872,7 +1067,9 @@ function PersonEditorPanelContent({
 }
 
 export function PersonEditorPanel(props: PersonEditorPanelProps) {
-  const panelKey = props.person?.id ?? "new-profile";
+  const panelKey = props.person
+    ? `${props.person.id}:${JSON.stringify(formStateFromPerson(props.person))}`
+    : "new-profile";
 
   return <PersonEditorPanelContent key={panelKey} {...props} />;
 }

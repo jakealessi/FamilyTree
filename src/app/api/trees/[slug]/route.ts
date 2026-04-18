@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { canEditTree, canView } from "@/lib/server/permissions";
 import { jsonError, readTreeAuth, resolveTreeAccessFromRequest } from "@/lib/server/request";
 import { prisma } from "@/lib/server/db";
+import { resolveMediaReferences } from "@/lib/server/media-storage";
 import { buildTreeLink } from "@/lib/server/tokens";
 import { toStringArray } from "@/lib/shared/utils";
 import type { TreeBundle } from "@/types/family-tree";
@@ -109,6 +110,24 @@ export async function GET(request: Request, context: RouteContext) {
         }
       : undefined;
 
+  const mediaReferences = new Set<string>();
+  for (const person of tree.people) {
+    if (person.profilePhotoUrl) {
+      mediaReferences.add(person.profilePhotoUrl);
+    }
+
+    for (const galleryUrl of serializeJsonArray(person.galleryPhotos)) {
+      mediaReferences.add(galleryUrl);
+    }
+
+    for (const media of person.media) {
+      mediaReferences.add(media.url);
+    }
+  }
+  const resolvedMediaReferences = await resolveMediaReferences([...mediaReferences]);
+  const resolveMediaUrl = (value: string | null | undefined) =>
+    value ? (resolvedMediaReferences.get(value) ?? value) : null;
+
   const response: TreeBundle = {
     tree: {
       id: tree.id,
@@ -135,44 +154,61 @@ export async function GET(request: Request, context: RouteContext) {
     links:
       access.role === "OWNER"
         ? {
+            owner: buildTreeLink(origin, tree.slug, tree.ownerToken),
             stable: buildTreeLink(origin, tree.slug),
             edit: buildTreeLink(origin, tree.slug, tree.contributorToken),
             viewer: tree.viewerToken ? buildTreeLink(origin, tree.slug, tree.viewerToken) : null,
           }
         : undefined,
-    people: tree.people.map((person) => ({
-      id: person.id,
-      firstName: person.firstName,
-      middleName: person.middleName,
-      lastName: person.lastName,
-      maidenName: person.maidenName,
-      nickname: person.nickname,
-      gender: person.gender,
-      lifeStatus: person.lifeStatus,
-      birthDate: person.birthDate?.toISOString() ?? null,
-      deathDate: person.deathDate?.toISOString() ?? null,
-      birthplace: person.birthplace,
-      currentCity: person.currentCity,
-      bio: person.bio,
-      occupation: person.occupation,
-      education: person.education,
-      hobbies: person.hobbies,
-      favoriteQuote: person.favoriteQuote,
-      profilePhotoUrl: person.profilePhotoUrl,
-      galleryPhotos: serializeJsonArray(person.galleryPhotos),
-      lifeEvents: serializeJsonArray(person.lifeEvents),
-      notes: serializeJsonArray(person.notes),
-      layoutX: person.layoutX,
-      layoutY: person.layoutY,
-      isPrivate: person.isPrivate,
-      claimedBy: person.claimedBy,
-      media: person.media.map((media) => ({
-        id: media.id,
-        type: media.type,
-        url: media.url,
-        caption: media.caption,
-      })),
-    })),
+    people: tree.people.map((person) => {
+      const galleryPhotos = serializeJsonArray(person.galleryPhotos)
+        .map((value) => resolveMediaUrl(value))
+        .filter((value): value is string => Boolean(value));
+      const media = person.media
+        .map((mediaItem) => {
+          const resolvedUrl = resolveMediaUrl(mediaItem.url);
+          if (!resolvedUrl) {
+            return null;
+          }
+
+          return {
+            id: mediaItem.id,
+            type: mediaItem.type,
+            url: resolvedUrl,
+            caption: mediaItem.caption,
+          };
+        })
+        .filter((value): value is NonNullable<typeof value> => value !== null);
+
+      return {
+        id: person.id,
+        firstName: person.firstName,
+        middleName: person.middleName,
+        lastName: person.lastName,
+        maidenName: person.maidenName,
+        nickname: person.nickname,
+        gender: person.gender,
+        lifeStatus: person.lifeStatus,
+        birthDate: person.birthDate?.toISOString() ?? null,
+        deathDate: person.deathDate?.toISOString() ?? null,
+        birthplace: person.birthplace,
+        currentCity: person.currentCity,
+        bio: person.bio,
+        occupation: person.occupation,
+        education: person.education,
+        hobbies: person.hobbies,
+        favoriteQuote: person.favoriteQuote,
+        profilePhotoUrl: resolveMediaUrl(person.profilePhotoUrl),
+        galleryPhotos,
+        lifeEvents: serializeJsonArray(person.lifeEvents),
+        notes: serializeJsonArray(person.notes),
+        layoutX: person.layoutX,
+        layoutY: person.layoutY,
+        isPrivate: person.isPrivate,
+        claimedBy: person.claimedBy,
+        media,
+      };
+    }),
     relationships: activeRelationships.map((relationship) => ({
       id: relationship.id,
       fromPersonId: relationship.fromPersonId,

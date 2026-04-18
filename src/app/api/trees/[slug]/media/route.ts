@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { DEFAULT_MAX_UPLOAD_BYTES } from "@/lib/shared/constants";
 import { prisma } from "@/lib/server/db";
 import { recordHistory } from "@/lib/server/history";
+import { storeUploadedImageFile } from "@/lib/server/media-storage";
 import { canEditPerson } from "@/lib/server/permissions";
 import { jsonError, resolveTreeAccessFromRequest } from "@/lib/server/request";
 
@@ -67,25 +68,48 @@ export async function POST(request: Request, context: RouteContext) {
   if (!url && file instanceof File) {
     const maxBytes = Number(process.env.MAX_UPLOAD_SIZE_BYTES ?? DEFAULT_MAX_UPLOAD_BYTES);
     if (file.size > maxBytes) {
-      return jsonError("That file is too large for the built-in demo uploader.", 413);
+      return jsonError("That file is too large.", 413);
     }
 
     if (!file.type.startsWith("image/")) {
       return jsonError("Only image uploads are supported for profile and gallery media.", 415);
     }
 
-    const bytes = Buffer.from(await file.arrayBuffer());
-    url = `data:${file.type};base64,${bytes.toString("base64")}`;
-    fileName = file.name;
-    mimeType = file.type;
-    sizeBytes = file.size;
+    try {
+      const bytes = Buffer.from(await file.arrayBuffer());
+      url = await storeUploadedImageFile({
+        bytes,
+        fileName: file.name,
+        mimeType: file.type,
+        treeSlug: access.tree.slug,
+        personId,
+        mediaType: type === "PROFILE" ? "PROFILE" : "GALLERY",
+      });
+      fileName = file.name;
+      mimeType = file.type;
+      sizeBytes = file.size;
+    } catch (error) {
+      const code =
+        typeof error === "object" && error !== null && "code" in error
+          ? String((error as { code: string }).code)
+          : "";
+
+      if (code === "MEDIA_STORAGE_NOT_CONFIGURED") {
+        return jsonError(
+          "File uploads need storage configured in production. Add the Supabase storage env vars or paste an external image URL for now.",
+          503,
+        );
+      }
+
+      return jsonError("That image could not be uploaded right now.", 502);
+    }
   }
 
   if (!url) {
     return jsonError("Provide either an uploaded file or an external URL.", 422);
   }
 
-  if (externalUrl && !isAllowedExternalImageUrl(externalUrl)) {
+  if (!fileName && externalUrl && !isAllowedExternalImageUrl(externalUrl)) {
     return jsonError("External media URLs must be valid http or https image links.", 422);
   }
 
@@ -115,7 +139,15 @@ export async function POST(request: Request, context: RouteContext) {
         },
       });
     } else {
-      const gallery = Array.isArray(person.galleryPhotos) ? person.galleryPhotos : [];
+      const latestPerson = await tx.person.findUnique({
+        where: { id: personId },
+        select: {
+          galleryPhotos: true,
+        },
+      });
+      const gallery = Array.isArray(latestPerson?.galleryPhotos)
+        ? latestPerson.galleryPhotos
+        : [];
       await tx.person.update({
         where: { id: personId },
         data: {

@@ -1,6 +1,6 @@
 # Branchbook
 
-Branchbook is a no-account collaborative family tree app built with Next.js, TypeScript, Tailwind CSS, Prisma, PostgreSQL, and React Flow.
+Branchbook is a no-account collaborative family tree app built with Next.js, TypeScript, Tailwind CSS, Prisma, and PostgreSQL.
 
 The product model is link-based instead of account-based:
 
@@ -17,6 +17,7 @@ The product model is link-based instead of account-based:
 - Rich person profiles with photos, life events, notes, occupations, quotes, and more
 - Parent, child, spouse, sibling, adopted, step, and foster relationships
 - Clear, readable family diagram with guided starter spaces for brand-new trees
+- Owner recovery link surfaced in the product so the tree creator can regain full control later
 - Moderation queue for structural edits
 - Edit history with rollback for supported changes
 - Archive-after-24-months behavior with owner/admin reactivation
@@ -30,7 +31,6 @@ The product model is link-based instead of account-based:
 - Tailwind CSS 4
 - Prisma 7
 - PostgreSQL
-- React Flow via `@xyflow/react`
 - Vercel-ready frontend with Supabase/Postgres-friendly backend setup
 
 ## Environment
@@ -46,8 +46,6 @@ Required values:
 - `DATABASE_URL`
 - `DIRECT_URL`
 - `NEXT_PUBLIC_APP_URL`
-- `ADMIN_RECOVERY_TOKEN`
-- `MAX_UPLOAD_SIZE_BYTES`
 
 ## Scripts
 
@@ -178,8 +176,6 @@ If you are using Supabase, their current guidance is:
 - `DATABASE_URL`
 - `DIRECT_URL`
 - `NEXT_PUBLIC_APP_URL`
-- `ADMIN_RECOVERY_TOKEN`
-- `MAX_UPLOAD_SIZE_BYTES`
 
 ### Important production note
 
@@ -189,5 +185,6 @@ Do not run `npm run db:seed` against production. The demo seed clears seeded rec
 
 - Vercel works well for the Next.js frontend and API routes.
 - Supabase Postgres is a natural fit for the database.
-- For production media storage, swap the demo data-URL uploader for Supabase Storage, Vercel Blob, or S3.
+- For production file uploads, set `SUPABASE_SERVICE_ROLE_KEY` and `SUPABASE_STORAGE_BUCKET` so media files go to Supabase Storage instead of inline demo storage.
+- If you do not configure production storage yet, pasted external image URLs will still work, but direct file uploads should be treated as incomplete setup.
 - The current build script uses webpack because Turbopack hit a sandbox-specific CSS worker limitation during local verification here.

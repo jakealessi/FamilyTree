@@ -95,10 +95,10 @@ export async function POST(request: Request) {
   return NextResponse.json({
     slug: tree.slug,
     links: {
+      owner: buildTreeLink(origin, tree.slug, ownerToken),
       stable: buildTreeLink(origin, tree.slug),
       edit: buildTreeLink(origin, tree.slug, contributorToken),
       viewer: viewerToken ? buildTreeLink(origin, tree.slug, viewerToken) : null,
-      legacyOwner: buildTreeLink(origin, tree.slug, ownerToken),
     },
   });
 }

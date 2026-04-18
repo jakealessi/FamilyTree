@@ -9,6 +9,12 @@ type StoredSession = {
   updatedAt: number;
 };
 
+function generateLocalToken() {
+  return typeof crypto !== "undefined" && "randomUUID" in crypto
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random()}`;
+}
+
 function readStorage() {
   if (typeof window === "undefined") {
     return null;
@@ -19,6 +25,10 @@ function readStorage() {
   } catch {
     return null;
   }
+}
+
+export function hasLocalStorageAccess() {
+  return readStorage() !== null;
 }
 
 function accessKey(slug: string) {
@@ -67,10 +77,6 @@ export function storeSession(
   nextSession: Partial<Pick<StoredSession, "token" | "personalToken">>,
 ) {
   const storage = readStorage();
-  if (!storage) {
-    return getStoredSession(slug);
-  }
-
   const current = getStoredSession(slug);
   const merged = {
     token:
@@ -84,12 +90,30 @@ export function storeSession(
     updatedAt: Date.now(),
   };
 
-  storage.setItem(accessKey(slug), JSON.stringify(merged));
+  if (storage) {
+    storage.setItem(accessKey(slug), JSON.stringify(merged));
+  }
+
   return merged;
 }
 
 export function clearStoredSession(slug: string) {
   readStorage()?.removeItem(accessKey(slug));
+}
+
+export function resetTreeDeviceAccess(slug: string) {
+  const storage = readStorage();
+  if (!storage) {
+    return null;
+  }
+
+  clearStoredSession(slug);
+  storage.removeItem(editorNameKey(slug));
+
+  const nextEditorToken = generateLocalToken();
+  storage.setItem(editorKey(slug), nextEditorToken);
+
+  return nextEditorToken;
 }
 
 /**
@@ -106,11 +130,7 @@ export function getOrCreateDeviceToken() {
     return existing;
   }
 
-  const next =
-    typeof crypto !== "undefined" && "randomUUID" in crypto
-      ? crypto.randomUUID()
-      : `${Date.now()}-${Math.random()}`;
-
+  const next = generateLocalToken();
   storage.setItem(DEVICE_KEY, next);
   return next;
 }

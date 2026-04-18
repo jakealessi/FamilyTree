@@ -8,5 +8,5 @@ export function Textarea({
   className,
   ...props
 }: React.TextareaHTMLAttributes<HTMLTextAreaElement>) {
-  return <textarea className={cn(fieldClassName, "min-h-28 resize-y", className)} {...props} />;
+  return <textarea className={cn(fieldClassName, "min-h-32 resize-y", className)} {...props} />;
 }
