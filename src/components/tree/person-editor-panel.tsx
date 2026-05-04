@@ -327,7 +327,7 @@ function PersonEditorPanelContent({
   function renderOverview() {
     if (!person) {
       return (
-        <div className="rounded-lg border border-dashed border-[color:var(--border-soft)] bg-[color:rgba(0,0,0,0.02)] p-6 text-sm text-[var(--ink-muted)]">
+        <div className="rounded-lg border border-dashed border-[color:var(--border-soft)] bg-[color:var(--wash-field)] p-6 text-sm text-[var(--ink-muted)]">
           <p className="font-semibold text-[var(--ink-strong)]">Choose a person to see details</p>
           <p className="mt-2 leading-6">
             Tap a person in the tree or the people list. If you want to add someone new, use
@@ -897,7 +897,7 @@ function PersonEditorPanelContent({
         </div>
 
         {mediaItems.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-[color:var(--border-soft)] bg-[color:rgba(0,0,0,0.02)] p-4 text-sm text-[var(--ink-muted)]">
+          <div className="rounded-lg border border-dashed border-[color:var(--border-soft)] bg-[color:var(--wash-field)] p-4 text-sm text-[var(--ink-muted)]">
             {canEdit
               ? "No photos yet. Paste an image link or choose a file below."
               : "No photos have been added for this person yet."}

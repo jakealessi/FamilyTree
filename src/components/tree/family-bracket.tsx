@@ -151,7 +151,7 @@ function PersonCard({
             event.stopPropagation();
             onEdit();
           }}
-          className="absolute right-2 top-2 rounded-md p-1.5 text-[var(--ink-muted)] transition hover:bg-[color:rgba(0,0,0,0.05)] hover:text-[var(--brand-forest)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--focus-ring)]"
+          className="absolute right-2 top-2 rounded-md p-1.5 text-[var(--ink-muted)] transition hover:bg-[color:rgba(42,74,47,0.08)] hover:text-[var(--brand-forest)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--focus-ring)]"
           aria-label={`Edit ${formatPersonName(person)}`}
         >
           <PencilLine className="size-4" />

@@ -22,6 +22,10 @@
   --state-danger-bg: rgba(154, 65, 54, 0.08);
   --state-danger-text: #7a3329;
   --focus-ring: rgba(42, 74, 47, 0.35);
+  /* Warm overlays and fills — avoid neutral black grays on surfaces */
+  --overlay-frost: rgba(244, 241, 235, 0.86);
+  --wash-field: rgba(88, 67, 44, 0.045);
+  --wash-panel: rgba(88, 67, 44, 0.06);
 }
 
 @keyframes ui-spin {

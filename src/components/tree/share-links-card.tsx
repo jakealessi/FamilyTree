@@ -134,7 +134,7 @@ export function ShareLinksCard({ links }: { links: ShareLinks }) {
                   readOnly
                   value={item.value}
                   aria-label={`${item.label} URL`}
-                  className="w-full rounded-2xl border border-[color:var(--border-soft)] bg-[color:rgba(0,0,0,0.02)] px-3 py-2.5 font-mono text-[11px] text-[var(--ink-soft)]"
+                  className="w-full rounded-2xl border border-[color:var(--border-soft)] bg-[color:var(--wash-field)] px-3 py-2.5 font-mono text-[11px] text-[var(--ink-soft)]"
                 />
                 <Button
                   variant="outline"

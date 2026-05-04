@@ -1023,7 +1023,7 @@ export function TreeWorkspace({
         <div className="mb-6 space-y-3">
           {bundle.access.isArchived ? (
             <div
-              className="rounded-2xl border border-[color:var(--border-soft)] bg-[color:rgba(0,0,0,0.03)] p-4 text-sm text-[var(--ink-strong)]"
+              className="rounded-2xl border border-[color:var(--border-soft)] bg-[color:var(--wash-panel)] p-4 text-sm text-[var(--ink-strong)]"
               role="status"
             >
               <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
@@ -1579,7 +1579,7 @@ export function TreeWorkspace({
           </div>
 
       {personEditorOpen && bundle ? (
-        <div className="fixed inset-0 z-40 flex items-start justify-center overflow-y-auto bg-black/45 px-4 py-8 md:py-12">
+        <div className="fixed inset-0 z-40 flex items-start justify-center overflow-y-auto bg-[color:var(--overlay-frost)] px-4 py-8 backdrop-blur-[4px] md:py-12">
           <button
             type="button"
             aria-label="Close profile editor"
@@ -1654,7 +1654,7 @@ export function TreeWorkspace({
       ) : null}
 
       {nameGateOpen && bundle?.myEditor?.needsNamePrompt ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 px-4 py-8">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[color:var(--overlay-frost)] px-4 py-8 backdrop-blur-[4px]">
           <Card className="w-full max-w-md space-y-4 p-6 shadow-lg">
             <h2 className="text-lg font-semibold text-[var(--ink-strong)]">
               Tell family who is editing
@@ -1680,7 +1680,7 @@ export function TreeWorkspace({
       ) : null}
 
       {selectedPersonForWorkspace && !personEditorOpen ? (
-        <div className="fixed inset-x-0 bottom-0 z-30 border-t border-[color:var(--border-soft)] bg-[color:rgba(248,244,236,0.96)] px-4 py-3 shadow-[0_-10px_30px_rgba(0,0,0,0.08)] backdrop-blur md:hidden">
+        <div className="fixed inset-x-0 bottom-0 z-30 border-t border-[color:var(--border-soft)] bg-[color:rgba(248,244,236,0.96)] px-4 py-3 shadow-[0_-12px_32px_rgba(47,36,28,0.07)] backdrop-blur md:hidden">
           <div className="mx-auto max-w-[1440px]">
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ink-muted)]">
               Working on
